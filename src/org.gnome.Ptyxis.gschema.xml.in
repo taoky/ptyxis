@@ -190,6 +190,12 @@
       <description>Restore tabs from previous session when starting Ptyxis</description>
     </key>
 
+    <key name="select-to-copy" type="b">
+      <default>false</default>
+      <summary>Select to Copy</summary>
+      <description>Immediately copy text to clipboard when selected</description>
+    </key>
+
     <key name="restore-window-size" type="b">
       <default>true</default>
       <summary>Restore Window Size</summary>

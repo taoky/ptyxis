@@ -52,6 +52,7 @@ G_BEGIN_DECLS
 #define PTYXIS_SETTING_KEY_TAB_MIDDLE_CLICK        "tab-middle-click"
 #define PTYXIS_SETTING_KEY_IGNORE_OSC_TITLE        "ignore-osc-title"
 #define PTYXIS_SETTING_KEY_INHIBIT_LOGOUT          "inhibit-logout"
+#define PTYXIS_SETTING_KEY_SELECT_TO_COPY          "select-to-copy"
 
 typedef enum _PtyxisNewTabPosition
 {
@@ -177,5 +178,8 @@ void                    ptyxis_settings_set_ignore_osc_title        (PtyxisSetti
 gboolean                ptyxis_settings_get_inhibit_logout          (PtyxisSettings             *self);
 void                    ptyxis_settings_set_inhibit_logout          (PtyxisSettings             *self,
                                                                      gboolean                    inhibit_logout);
+gboolean                ptyxis_settings_get_select_to_copy          (PtyxisSettings             *self);
+void                    ptyxis_settings_set_select_to_copy          (PtyxisSettings             *self,
+                                                                     gboolean                    select_to_copy);
 
 G_END_DECLS

@@ -23,6 +23,7 @@
 
 #include <gio/gio.h>
 
+#include "glib.h"
 #include "ptyxis-application.h"
 #include "ptyxis-enums.h"
 #include "ptyxis-settings.h"
@@ -54,6 +55,7 @@ enum {
   PROP_DEFAULT_COLUMNS,
   PROP_DEFAULT_ROWS,
   PROP_SCROLLBAR_POLICY,
+  PROP_SELECT_TO_COPY,
   PROP_TAB_MIDDLE_CLICK,
   PROP_TEXT_BLINK_MODE,
   PROP_TOAST_ON_COPY_CLIPBOARD,
@@ -122,6 +124,8 @@ ptyxis_settings_changed_cb (PtyxisSettings *self,
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
   else if (g_str_equal (key, PTYXIS_SETTING_KEY_INHIBIT_LOGOUT))
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_INHIBIT_LOGOUT]);
+  else if (g_str_equal (key, PTYXIS_SETTING_KEY_SELECT_TO_COPY))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SELECT_TO_COPY]);
   else if (g_str_equal (key, PTYXIS_SETTING_KEY_FONT_NAME))
     {
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_FONT_NAME]);
@@ -186,6 +190,10 @@ ptyxis_settings_get_property (GObject    *object,
 
     case PROP_INHIBIT_LOGOUT:
       g_value_set_boolean (value, ptyxis_settings_get_inhibit_logout (self));
+      break;
+    
+    case PROP_SELECT_TO_COPY:
+      g_value_set_boolean (value, ptyxis_settings_get_select_to_copy (self));
       break;
 
     case PROP_FONT_DESC:
@@ -297,6 +305,10 @@ ptyxis_settings_set_property (GObject      *object,
 
     case PROP_INHIBIT_LOGOUT:
       ptyxis_settings_set_inhibit_logout (self, g_value_get_boolean (value));
+      break;
+    
+    case PROP_SELECT_TO_COPY:
+      ptyxis_settings_set_select_to_copy (self, g_value_get_boolean (value));
       break;
 
     case PROP_FONT_NAME:
@@ -423,6 +435,13 @@ ptyxis_settings_class_init (PtyxisSettingsClass *klass)
 
   properties[PROP_INHIBIT_LOGOUT] =
     g_param_spec_boolean (PTYXIS_SETTING_KEY_INHIBIT_LOGOUT, NULL, NULL,
+                          FALSE,
+                          (G_PARAM_READWRITE |
+                           G_PARAM_EXPLICIT_NOTIFY |
+                           G_PARAM_STATIC_STRINGS));
+  
+  properties[PROP_SELECT_TO_COPY] =
+    g_param_spec_boolean (PTYXIS_SETTING_KEY_SELECT_TO_COPY, NULL, NULL,
                           FALSE,
                           (G_PARAM_READWRITE |
                            G_PARAM_EXPLICIT_NOTIFY |
@@ -1215,4 +1234,24 @@ ptyxis_settings_get_inhibit_logout (PtyxisSettings *self)
 
   return g_settings_get_boolean (self->settings,
                                  PTYXIS_SETTING_KEY_INHIBIT_LOGOUT);
+}
+
+void
+ptyxis_settings_set_select_to_copy (PtyxisSettings *self,
+                                    gboolean        select_to_copy)
+{
+  g_return_if_fail (PTYXIS_IS_SETTINGS (self));
+
+  g_settings_set_boolean (self->settings,
+                          PTYXIS_SETTING_KEY_SELECT_TO_COPY,
+                          !!select_to_copy);
+}
+
+gboolean
+ptyxis_settings_get_select_to_copy (PtyxisSettings *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_SETTINGS (self), FALSE);
+
+  return g_settings_get_boolean (self->settings,
+                                 PTYXIS_SETTING_KEY_SELECT_TO_COPY);
 }

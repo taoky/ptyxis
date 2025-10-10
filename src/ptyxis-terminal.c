@@ -22,6 +22,7 @@
  */
 
 #include "config.h"
+#include "glib.h"
 
 #define PCRE2_CODE_UNIT_WIDTH 0
 #include <pcre2.h>
@@ -424,6 +425,7 @@ copy_clipboard_action (GtkWidget  *widget,
   GdkClipboard *clipboard = gtk_widget_get_clipboard (widget);
   g_autofree char *text = NULL;
   VteFormat format = VTE_FORMAT_TEXT;
+  gboolean is_select_to_copy = g_strcmp0 (action_name, "clipboard.copy-by-select") == 0;
 
   if (strstr (action_name, "copy-as-html"))
     format = VTE_FORMAT_HTML;
@@ -436,7 +438,7 @@ copy_clipboard_action (GtkWidget  *widget,
 
       gdk_clipboard_set_text (clipboard, text);
 
-      if (ptyxis_settings_get_toast_on_copy_clipboard (settings))
+      if (ptyxis_settings_get_toast_on_copy_clipboard (settings) && !is_select_to_copy)
         ptyxis_terminal_toast (self, 1, _("Copied to clipboard"));
     }
 }
@@ -452,9 +454,26 @@ paste_clipboard_action (GtkWidget  *widget,
 }
 
 static void
+ptyxis_terminal_handle_select_to_copy (PtyxisTerminal *self)
+{
+  PtyxisSettings *settings;
+
+  g_assert (PTYXIS_IS_TERMINAL (self));
+
+  settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+
+  if (ptyxis_settings_get_select_to_copy (settings))
+    {
+      if (vte_terminal_get_has_selection (VTE_TERMINAL (self)))
+        copy_clipboard_action (GTK_WIDGET (self), "clipboard.copy-by-select", NULL);
+    }
+}
+
+static void
 ptyxis_terminal_selection_changed (VteTerminal *terminal)
 {
   ptyxis_terminal_update_clipboard_actions (PTYXIS_TERMINAL (terminal));
+  ptyxis_terminal_handle_select_to_copy (PTYXIS_TERMINAL (terminal));
 }
 
 static void

@@ -644,6 +644,17 @@
         </child>
         <child>
           <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Miscellaneous</property>
+            <child>
+              <object class="AdwSwitchRow" id="select_to_copy">
+                <property name="title" translatable="yes">Select text to copy</property>
+                <property name="subtitle" translatable="yes">Immediately copy text to clipboard when selected</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
             <child>
               <object class="GtkButton">
                 <style>
