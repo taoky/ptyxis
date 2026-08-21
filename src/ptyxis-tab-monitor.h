@@ -31,7 +31,8 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (PtyxisTabMonitor, ptyxis_tab_monitor, PTYXIS, TAB_MONITOR, GObject)
 
-PtyxisTabMonitor *ptyxis_tab_monitor_new                 (PtyxisTab        *tab);
+PtyxisTabMonitor *ptyxis_tab_monitor_new                 (PtyxisTab        *tab,
+                                                          PtyxisPane       *pane);
 gboolean          ptyxis_tab_monitor_get_has_pressed_key (PtyxisTabMonitor *self);
 void              ptyxis_tab_monitor_set_has_pressed_key (PtyxisTabMonitor *self,
                                                           gboolean          has_pressed_key);

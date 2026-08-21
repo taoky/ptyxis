@@ -32,6 +32,7 @@ struct _PtyxisTabMonitor
 {
   GObject   parent_instance;
   GWeakRef  tab_wr;
+  GWeakRef  pane_wr;
   GWeakRef  terminal_wr;
   GSource  *update_source;
   int       current_delay_msec;
@@ -123,15 +124,16 @@ ptyxis_tab_monitor_update_source_func (gpointer user_data)
 {
   PtyxisTabMonitor *self = user_data;
   g_autoptr(PtyxisTab) tab = NULL;
+  g_autoptr(PtyxisPane) pane = NULL;
   g_autoptr(PtyxisTerminal) terminal = NULL;
   PtyxisIpcProcess *process;
 
   g_assert (PTYXIS_IS_TAB_MONITOR (self));
 
   if ((tab = g_weak_ref_get (&self->tab_wr)) &&
+      (pane = g_weak_ref_get (&self->pane_wr)) &&
       (terminal = g_weak_ref_get (&self->terminal_wr)) &&
-      ptyxis_tab_get_terminal (tab) == terminal &&
-      (process = ptyxis_tab_get_process (tab)))
+      (process = ptyxis_pane_get_process (pane)))
     {
       ptyxis_tab_monitor_same_delay (self);
 
@@ -139,10 +141,11 @@ ptyxis_tab_monitor_update_source_func (gpointer user_data)
         {
           self->is_polling = TRUE;
 
-          ptyxis_tab_poll_agent_async (tab,
-                                       NULL,
-                                       ptyxis_tab_monitor_poll_agent_cb,
-                                       g_object_ref (self));
+          ptyxis_tab_poll_pane_agent_async (tab,
+                                            pane,
+                                            NULL,
+                                            ptyxis_tab_monitor_poll_agent_cb,
+                                            g_object_ref (self));
         }
 
       return G_SOURCE_CONTINUE;
@@ -247,18 +250,17 @@ ptyxis_tab_monitor_key_pressed_cb (PtyxisTabMonitor      *self,
 }
 
 static void
-ptyxis_tab_monitor_set_tab (PtyxisTabMonitor *self,
-                            PtyxisTab        *tab)
+ptyxis_tab_monitor_set_pane (PtyxisTabMonitor *self,
+                             PtyxisPane       *pane)
 {
   PtyxisTerminal *terminal;
   GtkEventController *controller;
 
   g_assert (PTYXIS_IS_TAB_MONITOR (self));
-  g_assert (PTYXIS_IS_TAB (tab));
+  g_assert (PTYXIS_IS_PANE (pane));
 
-  g_weak_ref_set (&self->tab_wr, tab);
-
-  terminal = ptyxis_tab_get_terminal (tab);
+  g_weak_ref_set (&self->pane_wr, pane);
+  terminal = ptyxis_pane_get_terminal (pane);
   g_weak_ref_set (&self->terminal_wr, terminal);
 
   g_signal_connect_object (terminal,
@@ -294,6 +296,7 @@ ptyxis_tab_monitor_finalize (GObject *object)
     }
 
   g_weak_ref_clear (&self->tab_wr);
+  g_weak_ref_clear (&self->pane_wr);
   g_weak_ref_clear (&self->terminal_wr);
 
   G_OBJECT_CLASS (ptyxis_tab_monitor_parent_class)->finalize (object);
@@ -329,7 +332,7 @@ ptyxis_tab_monitor_set_property (GObject      *object,
   switch (prop_id)
     {
     case PROP_TAB:
-      ptyxis_tab_monitor_set_tab (self, g_value_get_object (value));
+      g_weak_ref_set (&self->tab_wr, g_value_get_object (value));
       break;
 
     default:
@@ -362,17 +365,24 @@ ptyxis_tab_monitor_init (PtyxisTabMonitor *self)
   self->current_delay_msec = DELAY_MIN_MSEC;
 
   g_weak_ref_init (&self->tab_wr, NULL);
+  g_weak_ref_init (&self->pane_wr, NULL);
   g_weak_ref_init (&self->terminal_wr, NULL);
 }
 
 PtyxisTabMonitor *
-ptyxis_tab_monitor_new (PtyxisTab *tab)
+ptyxis_tab_monitor_new (PtyxisTab  *tab,
+                        PtyxisPane *pane)
 {
-  g_return_val_if_fail (PTYXIS_IS_TAB (tab), NULL);
+  PtyxisTabMonitor *self;
 
-  return g_object_new (PTYXIS_TYPE_TAB_MONITOR,
+  g_return_val_if_fail (PTYXIS_IS_TAB (tab), NULL);
+  g_return_val_if_fail (PTYXIS_IS_PANE (pane), NULL);
+
+  self = g_object_new (PTYXIS_TYPE_TAB_MONITOR,
                        "tab", tab,
                        NULL);
+  ptyxis_tab_monitor_set_pane (self, pane);
+  return self;
 }
 
 gboolean

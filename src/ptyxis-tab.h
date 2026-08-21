@@ -108,6 +108,11 @@ void                ptyxis_tab_poll_agent_async                   (PtyxisTab    
                                                                    GCancellable         *cancellable,
                                                                    GAsyncReadyCallback   callback,
                                                                    gpointer              user_data);
+void                ptyxis_tab_poll_pane_agent_async              (PtyxisTab            *self,
+                                                                   PtyxisPane           *pane,
+                                                                   GCancellable         *cancellable,
+                                                                   GAsyncReadyCallback   callback,
+                                                                   gpointer              user_data);
 gboolean            ptyxis_tab_poll_agent_finish                  (PtyxisTab            *self,
                                                                    GAsyncResult         *result,
                                                                    GError              **error);

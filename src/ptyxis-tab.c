@@ -97,6 +97,7 @@ static void ptyxis_tab_update_scrollback_lines (PtyxisTab *self);
 static void ptyxis_tab_update_cell_height_scale (PtyxisTab *self);
 static void ptyxis_tab_update_cell_width_scale (PtyxisTab *self);
 static void ptyxis_tab_update_custom_links (PtyxisTab *self);
+static gboolean ptyxis_tab_active_pane_is_running (PtyxisTab *self, char **cmdline);
 
 static void
 ptyxis_tab_update_split_sizing (PtyxisTab *self)
@@ -265,7 +266,7 @@ ptyxis_tab_connect_pane (PtyxisTab  *self,
 
   if (ptyxis_pane_get_monitor (pane) == NULL)
     {
-      monitor = ptyxis_tab_monitor_new (self);
+      monitor = ptyxis_tab_monitor_new (self, pane);
       ptyxis_pane_set_monitor (pane, monitor);
     }
   g_signal_connect_object (pane, "focus-entered",
@@ -1105,7 +1106,7 @@ ptyxis_tab_close_pane_action (GtkWidget  *widget,
     }
 
   settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
-  if (ptyxis_tab_is_running (self, NULL) && ptyxis_settings_get_prompt_on_close (settings))
+  if (ptyxis_tab_active_pane_is_running (self, NULL) && ptyxis_settings_get_prompt_on_close (settings))
     {
       GtkWindow *window = GTK_WINDOW (gtk_widget_get_root (widget));
 
@@ -2613,7 +2614,8 @@ ptyxis_tab_poll_agent_sync_cb (GObject      *object,
 }
 
 static gboolean
-ptyxis_tab_poll_agent (PtyxisTab *self)
+ptyxis_tab_poll_pane_agent (PtyxisTab  *self,
+                            PtyxisPane *pane)
 {
   Wait wait;
 
@@ -2623,15 +2625,35 @@ ptyxis_tab_poll_agent (PtyxisTab *self)
   wait.completed = FALSE;
   wait.success = FALSE;
 
-  ptyxis_tab_poll_agent_async (self,
-                               NULL,
-                               ptyxis_tab_poll_agent_sync_cb,
-                               &wait);
+  ptyxis_tab_poll_pane_agent_async (self,
+                                    pane,
+                                    NULL,
+                                    ptyxis_tab_poll_agent_sync_cb,
+                                    &wait);
 
   while (!wait.completed)
     g_main_context_iteration (wait.context, TRUE);
 
   return wait.success;
+}
+
+static gboolean
+ptyxis_tab_active_pane_is_running (PtyxisTab  *self,
+                                   char      **cmdline)
+{
+  PtyxisPane *pane;
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
+
+  pane = self->active_pane;
+  ptyxis_tab_poll_pane_agent (self, pane);
+
+  if (cmdline != NULL)
+    *cmdline = g_strdup (ptyxis_pane_get_command_line (pane));
+
+  return ptyxis_pane_get_has_foreground_process (pane) &&
+         !ptyxis_str_empty0 (ptyxis_pane_get_program_name (pane)) &&
+         !ptyxis_is_shell (ptyxis_pane_get_program_name (pane));
 }
 
 /**
@@ -2647,13 +2669,25 @@ ptyxis_tab_is_running (PtyxisTab  *self,
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
 
-  ptyxis_tab_poll_agent (self);
-
   if (cmdline != NULL)
-    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->active_pane));
+    *cmdline = NULL;
 
-  if (ptyxis_pane_get_has_foreground_process (self->active_pane) && ptyxis_pane_get_program_name (self->active_pane) != NULL)
-    return !ptyxis_is_shell (ptyxis_pane_get_program_name (self->active_pane));
+  for (guint i = 0; i < ptyxis_split_node_count_leaves (self->split_root); i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+
+      ptyxis_tab_poll_pane_agent (self, pane);
+
+      if (ptyxis_pane_get_has_foreground_process (pane) &&
+          !ptyxis_str_empty0 (ptyxis_pane_get_program_name (pane)) &&
+          !ptyxis_is_shell (ptyxis_pane_get_program_name (pane)))
+        {
+          if (cmdline != NULL)
+            *cmdline = g_strdup (ptyxis_pane_get_command_line (pane));
+          return TRUE;
+        }
+    }
 
   return FALSE;
 }
@@ -2852,25 +2886,26 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
 }
 
 void
-ptyxis_tab_poll_agent_async (PtyxisTab           *self,
-                             GCancellable        *cancellable,
-                             GAsyncReadyCallback  callback,
-                             gpointer             user_data)
+ptyxis_tab_poll_pane_agent_async (PtyxisTab           *self,
+                                  PtyxisPane          *pane,
+                                  GCancellable        *cancellable,
+                                  GAsyncReadyCallback  callback,
+                                  gpointer             user_data)
 {
   g_autoptr(GUnixFDList) fd_list = NULL;
   g_autoptr(GTask) task = NULL;
   PtyxisIpcProcess *process;
-  PtyxisPane *pane;
   PtyxisTerminal *terminal;
   VtePty *pty;
   int handle;
   int pty_fd;
 
   g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
+  g_assert (ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) != NULL);
 
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_source_tag (task, ptyxis_tab_poll_agent_async);
-  pane = self->active_pane;
   terminal = ptyxis_pane_get_terminal (pane);
   process = ptyxis_pane_get_process (pane);
   g_task_set_task_data (task, g_object_ref (pane), g_object_unref);
@@ -2912,6 +2947,17 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
 
 }
 
+void
+ptyxis_tab_poll_agent_async (PtyxisTab           *self,
+                             GCancellable        *cancellable,
+                             GAsyncReadyCallback  callback,
+                             gpointer             user_data)
+{
+  g_return_if_fail (PTYXIS_IS_TAB (self));
+
+  ptyxis_tab_poll_pane_agent_async (self, self->active_pane, cancellable, callback, user_data);
+}
+
 gboolean
 ptyxis_tab_poll_agent_finish (PtyxisTab     *self,
                               GAsyncResult  *result,
@@ -2930,7 +2976,7 @@ ptyxis_tab_has_foreground_process (PtyxisTab  *self,
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
 
-  ptyxis_tab_poll_agent (self);
+  ptyxis_tab_poll_pane_agent (self, self->active_pane);
 
   if (pid != NULL)
     *pid = ptyxis_pane_get_foreground_pid (self->active_pane);
