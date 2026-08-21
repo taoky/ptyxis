@@ -543,7 +543,12 @@ ptyxis_tab_wait_cb (GObject      *object,
       break;
 
     case PTYXIS_EXIT_ACTION_CLOSE:
-      if (ADW_IS_TAB_VIEW (tab_view) && ADW_IS_TAB_PAGE (page))
+      if (ptyxis_split_node_count_leaves (self->split_root) > 1 &&
+          ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) != NULL)
+        {
+          ptyxis_tab_remove_pane (self, pane);
+        }
+      else if (ADW_IS_TAB_VIEW (tab_view) && ADW_IS_TAB_PAGE (page))
         {
           if (adw_tab_page_get_pinned (page))
             adw_tab_view_set_page_pinned (ADW_TAB_VIEW (tab_view), page, FALSE);
