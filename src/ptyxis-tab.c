@@ -1847,6 +1847,7 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
     {
       g_object_freeze_notify (G_OBJECT (self));
       self->active_pane = pane;
+      ptyxis_tab_notify_set_terminal (&self->notify, ptyxis_pane_get_terminal (pane));
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ACTIVE_PANE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);

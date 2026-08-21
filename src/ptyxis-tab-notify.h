@@ -38,6 +38,7 @@ G_BEGIN_DECLS
 typedef struct _PtyxisTabNotify
 {
   PtyxisTab *tab;
+  GWeakRef terminal_wr;
 
   char *current_cmdline;
 
@@ -51,6 +52,41 @@ typedef struct _PtyxisTabNotify
 
   guint between_preexec_and_precmd : 1;
 } PtyxisTabNotify;
+
+static inline void ptyxis_tab_notify_shell_precmd_cb (PtyxisTerminal  *terminal,
+                                                       PtyxisTabNotify *notify);
+static inline void ptyxis_tab_notify_shell_preexec_cb (PtyxisTerminal  *terminal,
+                                                        PtyxisTabNotify *notify);
+
+static inline void
+ptyxis_tab_notify_set_terminal (PtyxisTabNotify *notify,
+                                PtyxisTerminal  *terminal)
+{
+  g_autoptr(PtyxisTerminal) old_terminal = NULL;
+
+  g_assert (notify != NULL);
+  g_assert (PTYXIS_IS_TERMINAL (terminal));
+
+  old_terminal = g_weak_ref_get (&notify->terminal_wr);
+  if (old_terminal != NULL)
+    {
+      g_clear_signal_handler (&notify->shell_precmd_handler, old_terminal);
+      g_clear_signal_handler (&notify->shell_preexec_handler, old_terminal);
+    }
+  else
+    {
+      notify->shell_precmd_handler = 0;
+      notify->shell_preexec_handler = 0;
+    }
+
+  g_weak_ref_set (&notify->terminal_wr, terminal);
+  notify->shell_precmd_handler =
+    g_signal_connect (terminal, "shell-precmd",
+                      G_CALLBACK (ptyxis_tab_notify_shell_precmd_cb), notify);
+  notify->shell_preexec_handler =
+    g_signal_connect (terminal, "shell-preexec",
+                      G_CALLBACK (ptyxis_tab_notify_shell_preexec_cb), notify);
+}
 
 static inline void
 ptyxis_tab_notify_show_notification (PtyxisTabNotify *notify,
@@ -174,6 +210,7 @@ ptyxis_tab_notify_init (PtyxisTabNotify *notify,
   PtyxisTerminal *terminal = ptyxis_tab_get_terminal (tab);
 
   notify->tab = tab;
+  g_weak_ref_init (&notify->terminal_wr, NULL);
 
   notify->contents_changed_source = 0;
   notify->shell_preexec_source = 0;
@@ -181,23 +218,13 @@ ptyxis_tab_notify_init (PtyxisTabNotify *notify,
   notify->current_cmdline = NULL;
   notify->command_start_time = 0;
 
-  notify->shell_precmd_handler =
-    g_signal_connect (terminal,
-                      "shell-precmd",
-                      G_CALLBACK (ptyxis_tab_notify_shell_precmd_cb),
-                      notify);
-
-  notify->shell_preexec_handler =
-    g_signal_connect (terminal,
-                      "shell-preexec",
-                      G_CALLBACK (ptyxis_tab_notify_shell_preexec_cb),
-                      notify);
+  ptyxis_tab_notify_set_terminal (notify, terminal);
 }
 
 static inline void
 ptyxis_tab_notify_destroy (PtyxisTabNotify *notify)
 {
-  PtyxisTerminal *terminal = ptyxis_tab_get_terminal (notify->tab);
+  g_autoptr(PtyxisTerminal) terminal = NULL;
 
   if (notify->tab == NULL)
     return;
@@ -205,8 +232,13 @@ ptyxis_tab_notify_destroy (PtyxisTabNotify *notify)
   g_clear_handle_id (&notify->contents_changed_source, g_source_remove);
   g_clear_handle_id (&notify->shell_preexec_source, g_source_remove);
 
-  g_clear_signal_handler (&notify->shell_precmd_handler, terminal);
-  g_clear_signal_handler (&notify->shell_preexec_handler, terminal);
+  terminal = g_weak_ref_get (&notify->terminal_wr);
+  if (terminal != NULL)
+    {
+      g_clear_signal_handler (&notify->shell_precmd_handler, terminal);
+      g_clear_signal_handler (&notify->shell_preexec_handler, terminal);
+    }
+  g_weak_ref_clear (&notify->terminal_wr);
 
   g_clear_pointer (&notify->current_cmdline, g_free);
 
