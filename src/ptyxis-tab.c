@@ -55,13 +55,6 @@ struct _PtyxisTab
 {
   GtkWidget                parent_instance;
 
-  char                    *initial_working_directory_uri;
-  char                    *previous_working_directory_uri;
-  char                    *title_prefix;
-  char                    *uuid;
-  PtyxisIpcContainer      *container_at_creation;
-  char                   **command;
-  char                    *initial_title;
   GdkTexture              *cached_texture;
   AdwBanner               *banner;
   PtyxisPane              *pane;
@@ -423,7 +416,7 @@ ptyxis_tab_wait_cb (GObject      *object,
   /* If this was started with something like ptyxis_window_new_for_command()
    * then we just want to exit the application (so allow tab to close).
    */
-  if (self->command != NULL)
+  if (ptyxis_pane_get_command (self->pane) != NULL)
     exit_action = PTYXIS_EXIT_ACTION_CLOSE;
 
   if (ADW_IS_TAB_VIEW (tab_view))
@@ -442,7 +435,7 @@ ptyxis_tab_wait_cb (GObject      *object,
    * allow ourselves to auto-close in that case as it's likely an error
    * the user would want to see.
    */
-  if ((self->command == NULL || self->state == PTYXIS_TAB_STATE_FAILED) &&
+  if ((ptyxis_pane_get_command (self->pane) == NULL || self->state == PTYXIS_TAB_STATE_FAILED) &&
       (g_get_monotonic_time () - self->respawn_time) < (G_USEC_PER_SEC/2) &&
       !ptyxis_tab_monitor_get_has_pressed_key (ptyxis_pane_get_monitor (self->pane)))
     exit_action = PTYXIS_EXIT_ACTION_NONE;
@@ -527,6 +520,7 @@ ptyxis_tab_respawn (PtyxisTab *self)
 {
   g_autofree char *default_container = NULL;
   g_autoptr(PtyxisIpcContainer) container = NULL;
+  g_autoptr(PtyxisIpcContainer) container_at_creation = NULL;
   g_autoptr(VtePty) new_pty = NULL;
   PtyxisApplication *app;
   const char *profile_uuid;
@@ -544,8 +538,9 @@ ptyxis_tab_respawn (PtyxisTab *self)
   profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
   default_container = ptyxis_profile_dup_default_container (ptyxis_tab_get_profile (self));
 
-  if (self->container_at_creation != NULL)
-    container = g_object_ref (self->container_at_creation);
+  container_at_creation = ptyxis_pane_dup_container (self->pane);
+  if (container_at_creation != NULL)
+    container = g_object_ref (container_at_creation);
   else
     container = ptyxis_application_lookup_container (app, default_container);
 
@@ -592,16 +587,16 @@ ptyxis_tab_respawn (PtyxisTab *self)
       pty = new_pty;
     }
 
-  cwd_uri = self->previous_working_directory_uri;
-  if (self->initial_working_directory_uri)
-    cwd_uri = self->initial_working_directory_uri;
+  cwd_uri = ptyxis_pane_get_previous_working_directory_uri (self->pane);
+  if (ptyxis_pane_get_initial_working_directory_uri (self->pane))
+    cwd_uri = ptyxis_pane_get_initial_working_directory_uri (self->pane);
 
   ptyxis_application_spawn_async (PTYXIS_APPLICATION_DEFAULT,
                                   container,
                                   ptyxis_tab_get_profile (self),
                                   cwd_uri,
                                   pty,
-                                  (const char * const *)self->command,
+                                  ptyxis_pane_get_command (self->pane),
                                   NULL,
                                   ptyxis_tab_spawn_cb,
                                   g_object_ref (self));
@@ -668,7 +663,7 @@ ptyxis_tab_notify_contains_focus_cb (PtyxisTab               *self,
     {
       ptyxis_tab_set_needs_attention (self, FALSE);
       g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                           self->uuid);
+                                           ptyxis_pane_get_uuid (self->pane));
     }
 }
 
@@ -760,7 +755,7 @@ ptyxis_tab_dup_icon (PtyxisTab *self)
 
         if (!(container = ptyxis_tab_discover_container (self)))
           {
-            if (!g_set_object (&container, self->container_at_creation))
+            if (!(container = ptyxis_pane_dup_container (self->pane)))
               {
                 if (ptyxis_tab_get_profile (self) != NULL)
                 {
@@ -1193,7 +1188,6 @@ ptyxis_tab_dispose (GObject *object)
 
   g_clear_object (&self->cached_texture);
   g_clear_object (&self->profile_signals);
-  g_clear_object (&self->container_at_creation);
 
   if (self->inhibit_cookie != 0)
     {
@@ -1202,25 +1196,10 @@ ptyxis_tab_dispose (GObject *object)
       self->inhibit_cookie = 0;
     }
 
-  g_clear_pointer (&self->initial_working_directory_uri, g_free);
-  g_clear_pointer (&self->previous_working_directory_uri, g_free);
-  g_clear_pointer (&self->title_prefix, g_free);
-  g_clear_pointer (&self->initial_title, g_free);
-  g_clear_pointer (&self->command, g_strfreev);
   g_clear_pointer (&self->command_line, g_free);
   g_clear_pointer (&self->program_name, g_free);
 
   G_OBJECT_CLASS (ptyxis_tab_parent_class)->dispose (object);
-}
-
-static void
-ptyxis_tab_finalize (GObject *object)
-{
-  PtyxisTab *self = (PtyxisTab *)object;
-
-  g_clear_pointer (&self->uuid, g_free);
-
-  G_OBJECT_CLASS (ptyxis_tab_parent_class)->finalize (object);
 }
 
 static void
@@ -1345,7 +1324,6 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
 
   object_class->constructed = ptyxis_tab_constructed;
   object_class->dispose = ptyxis_tab_dispose;
-  object_class->finalize = ptyxis_tab_finalize;
   object_class->get_property = ptyxis_tab_get_property;
   object_class->set_property = ptyxis_tab_set_property;
 
@@ -1515,7 +1493,6 @@ ptyxis_tab_init (PtyxisTab *self)
   GtkEventController *controller;
 
   self->state = PTYXIS_TAB_STATE_INITIAL;
-  self->uuid = g_uuid_string_random ();
 
   gtk_widget_init_template (GTK_WIDGET (self));
 
@@ -1624,7 +1601,7 @@ ptyxis_tab_get_title_prefix (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->title_prefix ? self->title_prefix : "";
+  return ptyxis_pane_get_title_prefix (self->pane) ?: "";
 }
 
 void
@@ -1636,8 +1613,9 @@ ptyxis_tab_set_title_prefix (PtyxisTab  *self,
   if (ptyxis_str_empty0 (title_prefix))
     title_prefix = NULL;
 
-  if (g_set_str (&self->title_prefix, title_prefix))
+  if (g_strcmp0 (ptyxis_pane_get_title_prefix (self->pane), title_prefix) != 0)
     {
+      ptyxis_pane_set_title_prefix (self->pane, title_prefix);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE_PREFIX]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
     }
@@ -1650,7 +1628,7 @@ ptyxis_tab_dup_title (PtyxisTab *self)
 
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  gstr = g_string_new (self->title_prefix);
+  gstr = g_string_new (ptyxis_pane_get_title_prefix (self->pane));
 
   if (!self->ignore_osc_title)
     {
@@ -1662,10 +1640,11 @@ ptyxis_tab_dup_title (PtyxisTab *self)
 
       if (window_title && window_title[0])
         g_string_append (gstr, window_title);
-      else if (self->command != NULL && self->command[0] != NULL)
-        g_string_append (gstr, self->command[0]);
-      else if (self->initial_title != NULL)
-        g_string_append (gstr, self->initial_title);
+      else if (ptyxis_pane_get_command (self->pane) != NULL &&
+               ptyxis_pane_get_command (self->pane)[0] != NULL)
+        g_string_append (gstr, ptyxis_pane_get_command (self->pane)[0]);
+      else if (ptyxis_pane_get_initial_title (self->pane) != NULL)
+        g_string_append (gstr, ptyxis_pane_get_initial_title (self->pane));
     }
 
   if (gstr->len == 0)
@@ -1734,7 +1713,7 @@ ptyxis_tab_set_initial_working_directory_uri (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  g_set_str (&self->initial_working_directory_uri, initial_working_directory_uri);
+  ptyxis_pane_set_initial_working_directory_uri (self->pane, initial_working_directory_uri);
 }
 
 char *
@@ -1742,7 +1721,7 @@ ptyxis_tab_dup_previous_working_directory_uri (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return g_strdup (self->previous_working_directory_uri);
+  return g_strdup (ptyxis_pane_get_previous_working_directory_uri (self->pane));
 }
 
 
@@ -1752,7 +1731,7 @@ ptyxis_tab_set_previous_working_directory_uri (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  g_set_str (&self->previous_working_directory_uri, previous_working_directory_uri);
+  ptyxis_pane_set_previous_working_directory_uri (self->pane, previous_working_directory_uri);
 }
 
 static void
@@ -1988,7 +1967,7 @@ ptyxis_tab_get_uuid (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->uuid;
+  return ptyxis_pane_get_uuid (self->pane);
 }
 
 PtyxisIpcContainer *
@@ -2005,7 +1984,7 @@ ptyxis_tab_dup_container (PtyxisTab *self)
     container = ptyxis_application_find_container_by_name (PTYXIS_APPLICATION_DEFAULT, runtime, name);
 
   if (container == NULL)
-    g_set_object (&container, self->container_at_creation);
+    container = ptyxis_pane_dup_container (self->pane);
 
   return g_steal_pointer (&container);
 }
@@ -2017,7 +1996,7 @@ ptyxis_tab_set_container (PtyxisTab          *self,
   g_return_if_fail (PTYXIS_IS_TAB (self));
   g_return_if_fail (!container || PTYXIS_IPC_IS_CONTAINER (container));
 
-  g_set_object (&self->container_at_creation, container);
+  ptyxis_pane_set_container (self->pane, container);
 }
 
 static void
@@ -2195,16 +2174,12 @@ void
 ptyxis_tab_set_command (PtyxisTab          *self,
                         const char * const *command)
 {
-  char **copy;
-
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
   if (command != NULL && command[0] == NULL)
     command = NULL;
 
-  copy = g_strdupv ((char **)command);
-  g_strfreev (self->command);
-  self->command = copy;
+  ptyxis_pane_set_command (self->pane, command);
 }
 
 const char *
@@ -2212,7 +2187,7 @@ ptyxis_tab_get_initial_title (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->initial_title;
+  return ptyxis_pane_get_initial_title (self->pane);
 }
 
 void
@@ -2221,7 +2196,7 @@ ptyxis_tab_set_initial_title (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  g_set_str (&self->initial_title, initial_title);
+  ptyxis_pane_set_initial_title (self->pane, initial_title);
 }
 
 const char *

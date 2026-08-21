@@ -64,6 +64,25 @@ void              ptyxis_pane_set_process (PtyxisPane     *self,
 PtyxisTabMonitor *ptyxis_pane_get_monitor (PtyxisPane      *self);
 void              ptyxis_pane_set_monitor (PtyxisPane      *self,
                                             PtyxisTabMonitor *monitor);
+const char       *ptyxis_pane_get_uuid     (PtyxisPane      *self);
+const char *const *ptyxis_pane_get_command (PtyxisPane      *self);
+void              ptyxis_pane_set_command (PtyxisPane      *self,
+                                            const char *const *command);
+const char *ptyxis_pane_get_initial_working_directory_uri (PtyxisPane *self);
+void        ptyxis_pane_set_initial_working_directory_uri (PtyxisPane *self,
+                                                            const char *uri);
+const char *ptyxis_pane_get_previous_working_directory_uri (PtyxisPane *self);
+void        ptyxis_pane_set_previous_working_directory_uri (PtyxisPane *self,
+                                                             const char *uri);
+PtyxisIpcContainer *ptyxis_pane_dup_container (PtyxisPane         *self);
+void                ptyxis_pane_set_container (PtyxisPane         *self,
+                                               PtyxisIpcContainer *container);
+const char *ptyxis_pane_get_initial_title (PtyxisPane *self);
+void        ptyxis_pane_set_initial_title (PtyxisPane *self,
+                                           const char *title);
+const char *ptyxis_pane_get_title_prefix  (PtyxisPane *self);
+void        ptyxis_pane_set_title_prefix  (PtyxisPane *self,
+                                           const char *prefix);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 

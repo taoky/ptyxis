@@ -14,6 +14,13 @@ struct _PtyxisPane
   PtyxisTabMonitor *monitor;
   PtyxisTerminal *terminal;
   PtyxisZoomLevel zoom;
+  char *uuid;
+  char **command;
+  char *initial_working_directory_uri;
+  char *previous_working_directory_uri;
+  PtyxisIpcContainer *container;
+  char *initial_title;
+  char *title_prefix;
 };
 
 enum {
@@ -39,10 +46,26 @@ ptyxis_pane_dispose (GObject *object)
   g_clear_object (&self->profile);
   g_clear_object (&self->process);
   g_clear_object (&self->monitor);
+  g_clear_object (&self->container);
+  g_clear_pointer (&self->command, g_strfreev);
+  g_clear_pointer (&self->initial_working_directory_uri, g_free);
+  g_clear_pointer (&self->previous_working_directory_uri, g_free);
+  g_clear_pointer (&self->initial_title, g_free);
+  g_clear_pointer (&self->title_prefix, g_free);
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
 
   G_OBJECT_CLASS (ptyxis_pane_parent_class)->dispose (object);
+}
+
+static void
+ptyxis_pane_finalize (GObject *object)
+{
+  PtyxisPane *self = PTYXIS_PANE (object);
+
+  g_clear_pointer (&self->uuid, g_free);
+
+  G_OBJECT_CLASS (ptyxis_pane_parent_class)->finalize (object);
 }
 
 static void
@@ -106,6 +129,7 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
 
   object_class->dispose = ptyxis_pane_dispose;
+  object_class->finalize = ptyxis_pane_finalize;
   object_class->get_property = ptyxis_pane_get_property;
   object_class->set_property = ptyxis_pane_set_property;
 
@@ -141,6 +165,7 @@ static void
 ptyxis_pane_init (PtyxisPane *self)
 {
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
+  self->uuid = g_uuid_string_random ();
 }
 
 PtyxisZoomLevel
@@ -199,6 +224,105 @@ ptyxis_pane_set_monitor (PtyxisPane       *self,
 
   if (g_set_object (&self->monitor, monitor))
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_MONITOR]);
+}
+
+const char *
+ptyxis_pane_get_uuid (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->uuid;
+}
+
+const char *const *
+ptyxis_pane_get_command (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return (const char *const *)self->command;
+}
+
+void
+ptyxis_pane_set_command (PtyxisPane       *self,
+                         const char *const *command)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_strfreev (self->command);
+  self->command = g_strdupv ((char **)command);
+}
+
+const char *
+ptyxis_pane_get_initial_working_directory_uri (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->initial_working_directory_uri;
+}
+
+void
+ptyxis_pane_set_initial_working_directory_uri (PtyxisPane *self,
+                                               const char *uri)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->initial_working_directory_uri, uri);
+}
+
+const char *
+ptyxis_pane_get_previous_working_directory_uri (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->previous_working_directory_uri;
+}
+
+void
+ptyxis_pane_set_previous_working_directory_uri (PtyxisPane *self,
+                                                const char *uri)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->previous_working_directory_uri, uri);
+}
+
+PtyxisIpcContainer *
+ptyxis_pane_dup_container (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->container ? g_object_ref (self->container) : NULL;
+}
+
+void
+ptyxis_pane_set_container (PtyxisPane         *self,
+                           PtyxisIpcContainer *container)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (container == NULL || PTYXIS_IPC_IS_CONTAINER (container));
+  g_set_object (&self->container, container);
+}
+
+const char *
+ptyxis_pane_get_initial_title (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->initial_title;
+}
+
+void
+ptyxis_pane_set_initial_title (PtyxisPane *self,
+                               const char *title)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->initial_title, title);
+}
+
+const char *
+ptyxis_pane_get_title_prefix (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->title_prefix;
+}
+
+void
+ptyxis_pane_set_title_prefix (PtyxisPane *self,
+                              const char *prefix)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->title_prefix, prefix);
 }
 
 PtyxisPane *
