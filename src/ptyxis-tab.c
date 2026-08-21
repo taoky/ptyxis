@@ -52,11 +52,9 @@ struct _PtyxisTab
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
   PtyxisTabNotify          notify;
-  GSignalGroup            *profile_signals;
 
   guint                    ignore_snapshot : 1;
 
-  guint                    inhibit_cookie;
 };
 
 enum {
@@ -291,11 +289,11 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
   /* Clear if the user has disabled logout inhibition */
   if (!ptyxis_settings_get_inhibit_logout (settings))
     {
-      if (self->inhibit_cookie)
+      if (ptyxis_pane_get_inhibit_cookie (self->pane))
         {
           gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                     self->inhibit_cookie);
-          self->inhibit_cookie = 0;
+                                     ptyxis_pane_get_inhibit_cookie (self->pane));
+          ptyxis_pane_set_inhibit_cookie (self->pane, 0);
         }
 
       return;
@@ -308,8 +306,8 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
     inhibit = TRUE;
 
   /* Check if we need to change the inhibit state */
-  if ((inhibit && self->inhibit_cookie != 0) ||
-      (!inhibit && self->inhibit_cookie == 0))
+  if ((inhibit && ptyxis_pane_get_inhibit_cookie (self->pane) != 0) ||
+      (!inhibit && ptyxis_pane_get_inhibit_cookie (self->pane) == 0))
     return;
 
   /* Get the window to use for the inhibit call */
@@ -320,18 +318,19 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
       /* Only inhibit if we have a valid window reference */
       if (window != NULL)
         {
-          self->inhibit_cookie =
+          ptyxis_pane_set_inhibit_cookie (
+            self->pane,
             gtk_application_inhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                      GTK_WINDOW (window),
                                      GTK_APPLICATION_INHIBIT_LOGOUT,
-                                     _("A foreground process is running"));
+                                     _("A foreground process is running")));
         }
     }
   else
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 self->inhibit_cookie);
-      self->inhibit_cookie = 0;
+                                 ptyxis_pane_get_inhibit_cookie (self->pane));
+      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
     }
 }
 
@@ -904,38 +903,37 @@ ptyxis_tab_constructed (GObject *object)
   ptyxis_tab_update_scrollbar_policy (self);
 
   /* Set up signal group for profile signals */
-  self->profile_signals = g_signal_group_new (PTYXIS_TYPE_PROFILE);
-  g_signal_connect_object (self->profile_signals,
+  g_signal_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                            "bind",
                            G_CALLBACK (ptyxis_tab_profile_signals_bind_cb),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (self->profile_signals,
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                                  "notify::limit-scrollback",
                                  G_CALLBACK (ptyxis_tab_update_scrollback_lines),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (self->profile_signals,
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                                  "notify::scrollback-lines",
                                  G_CALLBACK (ptyxis_tab_update_scrollback_lines),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (self->profile_signals,
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                                  "notify::cell-height-scale",
                                  G_CALLBACK (ptyxis_tab_update_cell_height_scale),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (self->profile_signals,
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                                  "notify::cell-width-scale",
                                  G_CALLBACK (ptyxis_tab_update_cell_width_scale),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (self->profile_signals,
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
                                  "custom-links-changed",
                                  G_CALLBACK (ptyxis_tab_update_custom_links),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_set_target (self->profile_signals, ptyxis_tab_get_profile (self));
+  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->pane), ptyxis_tab_get_profile (self));
 
   g_signal_connect_object (settings,
                            "notify::word-char-exceptions",
@@ -1127,11 +1125,11 @@ ptyxis_tab_unroot (GtkWidget *widget)
   /* Clear inhibit cookie when widget is unrooted since the window
    * reference may no longer be valid.
    */
-  if (self->inhibit_cookie != 0)
+  if (ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 self->inhibit_cookie);
-      self->inhibit_cookie = 0;
+                                 ptyxis_pane_get_inhibit_cookie (self->pane));
+      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
     }
 
   GTK_WIDGET_CLASS (ptyxis_tab_parent_class)->unroot (widget);
@@ -1167,13 +1165,11 @@ ptyxis_tab_dispose (GObject *object)
     gtk_widget_unparent (child);
 
   g_clear_object (&self->cached_texture);
-  g_clear_object (&self->profile_signals);
-
-  if (self->inhibit_cookie != 0)
+  if (ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 self->inhibit_cookie);
-      self->inhibit_cookie = 0;
+                                 ptyxis_pane_get_inhibit_cookie (self->pane));
+      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
     }
 
 
@@ -1567,7 +1563,7 @@ ptyxis_tab_apply_profile (PtyxisTab     *self,
 
   /* Replace the profile with the selected one. */
   ptyxis_pane_set_profile (self->pane, new_profile);
-  g_signal_group_set_target (self->profile_signals, new_profile);
+  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->pane), new_profile);
 
   /* Notify that the profile property changed */
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);

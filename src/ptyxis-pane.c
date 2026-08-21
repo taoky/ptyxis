@@ -10,6 +10,7 @@ struct _PtyxisPane
 {
   GtkWidget parent_instance;
   PtyxisProfile *profile;
+  GSignalGroup *profile_signals;
   PtyxisIpcProcess *process;
   PtyxisTabMonitor *monitor;
   PtyxisTerminal *terminal;
@@ -29,6 +30,7 @@ struct _PtyxisPane
   gint64 respawn_time;
   guint forced_exit : 1;
   guint ignore_osc_title : 1;
+  guint inhibit_cookie;
   guint has_foreground_process : 1;
 };
 
@@ -59,6 +61,7 @@ ptyxis_pane_dispose (GObject *object)
 
   self->terminal = NULL;
   g_clear_object (&self->profile);
+  g_clear_object (&self->profile_signals);
   g_clear_object (&self->process);
   g_clear_object (&self->monitor);
   g_clear_object (&self->container);
@@ -242,6 +245,7 @@ ptyxis_pane_init (PtyxisPane *self)
   self->uuid = g_uuid_string_random ();
   self->foreground_pid = -1;
   self->state = PTYXIS_PANE_STATE_INITIAL;
+  self->profile_signals = g_signal_group_new (PTYXIS_TYPE_PROFILE);
 }
 
 PtyxisZoomLevel
@@ -574,6 +578,28 @@ ptyxis_pane_set_ignore_osc_title (PtyxisPane *self,
       self->ignore_osc_title = ignore_osc_title;
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
     }
+}
+
+GSignalGroup *
+ptyxis_pane_get_profile_signals (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->profile_signals;
+}
+
+guint
+ptyxis_pane_get_inhibit_cookie (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), 0);
+  return self->inhibit_cookie;
+}
+
+void
+ptyxis_pane_set_inhibit_cookie (PtyxisPane *self,
+                                guint       inhibit_cookie)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  self->inhibit_cookie = inhibit_cookie;
 }
 
 PtyxisPane *

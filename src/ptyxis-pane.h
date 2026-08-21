@@ -130,6 +130,10 @@ void            ptyxis_pane_set_read_only    (PtyxisPane *self,
 gboolean        ptyxis_pane_get_ignore_osc_title (PtyxisPane *self);
 void            ptyxis_pane_set_ignore_osc_title (PtyxisPane *self,
                                                    gboolean    ignore_osc_title);
+GSignalGroup   *ptyxis_pane_get_profile_signals (PtyxisPane *self);
+guint           ptyxis_pane_get_inhibit_cookie  (PtyxisPane *self);
+void            ptyxis_pane_set_inhibit_cookie  (PtyxisPane *self,
+                                                  guint       inhibit_cookie);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 
