@@ -1183,7 +1183,8 @@ ptyxis_tab_notify_window_title_cb (PtyxisTab      *self,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+  if (terminal == self->terminal)
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
 }
 
 static void
@@ -1193,7 +1194,8 @@ ptyxis_tab_notify_window_subtitle_cb (PtyxisTab      *self,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SUBTITLE]);
+  if (terminal == self->terminal)
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SUBTITLE]);
 }
 
 static void
@@ -1203,7 +1205,8 @@ ptyxis_tab_increase_font_size_cb (PtyxisTab      *self,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  ptyxis_tab_zoom_in (self);
+  if (terminal == self->terminal)
+    ptyxis_tab_zoom_in (self);
 }
 
 static void
@@ -1213,7 +1216,8 @@ ptyxis_tab_decrease_font_size_cb (PtyxisTab      *self,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  ptyxis_tab_zoom_out (self);
+  if (terminal == self->terminal)
+    ptyxis_tab_zoom_out (self);
 }
 
 static void
@@ -1223,7 +1227,10 @@ ptyxis_tab_bell_cb (PtyxisTab      *self,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  g_signal_emit (self, signals[BELL], 0);
+  if (terminal == self->terminal && ptyxis_tab_is_active (self))
+    g_signal_emit (self, signals[BELL], 0);
+  else
+    ptyxis_tab_set_needs_attention (self, TRUE);
 }
 
 static PtyxisIpcContainer *
