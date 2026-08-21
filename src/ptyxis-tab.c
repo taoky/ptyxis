@@ -1414,21 +1414,13 @@ ptyxis_tab_snapshot (GtkWidget   *widget,
           GtkSnapshot *sub_snapshot = gtk_snapshot_new ();
           int scale_factor = gtk_widget_get_scale_factor (widget);
           g_autoptr(GskRenderNode) node = NULL;
-          graphene_matrix_t matrix;
           GskRenderer *renderer;
 
           gtk_snapshot_scale (sub_snapshot, scale_factor, scale_factor);
           gtk_snapshot_append_color (sub_snapshot,
                                      &bg,
                                      &GRAPHENE_RECT_INIT (0, 0, width, height));
-
-          if (gtk_widget_compute_transform (GTK_WIDGET (self->terminal),
-                                            GTK_WIDGET (self),
-                                            &matrix))
-            {
-              gtk_snapshot_transform_matrix (sub_snapshot, &matrix);
-              GTK_WIDGET_GET_CLASS (self->terminal)->snapshot (GTK_WIDGET (self->terminal), sub_snapshot);
-            }
+          GTK_WIDGET_CLASS (ptyxis_tab_parent_class)->snapshot (widget, sub_snapshot);
 
           node = gtk_snapshot_free_to_node (sub_snapshot);
           renderer = gtk_native_get_renderer (GTK_NATIVE (window));
