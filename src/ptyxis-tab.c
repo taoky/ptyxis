@@ -862,6 +862,88 @@ ptyxis_tab_split_position_changed_cb (GtkPaned        *paned,
     ptyxis_split_node_set_ratio (node, (double)position / extent);
 }
 
+static gboolean
+ptyxis_tab_apply_split_ratio_cb (GtkWidget     *widget,
+                                 GdkFrameClock *frame_clock,
+                                 gpointer       user_data)
+{
+  PtyxisSplitNode *node = user_data;
+  GtkOrientation orientation;
+  int extent;
+
+  orientation = gtk_orientable_get_orientation (GTK_ORIENTABLE (widget));
+  extent = orientation == GTK_ORIENTATION_HORIZONTAL
+         ? gtk_widget_get_width (widget)
+         : gtk_widget_get_height (widget);
+
+  if (extent <= 1)
+    return G_SOURCE_CONTINUE;
+
+  gtk_paned_set_position (GTK_PANED (widget),
+                          round (extent * ptyxis_split_node_get_ratio (node)));
+  return G_SOURCE_REMOVE;
+}
+
+static PtyxisPane *
+ptyxis_tab_split_pane (PtyxisTab            *self,
+                       PtyxisPane           *source,
+                       PtyxisSplitDirection  direction,
+                       double                ratio)
+{
+  g_autoptr(PtyxisPane) new_pane = NULL;
+  PtyxisSplitNode *leaf;
+  GtkWidget *old_parent;
+  GtkWidget *paned;
+  gboolean was_start = FALSE;
+
+  leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (source));
+  g_return_val_if_fail (leaf != NULL, NULL);
+
+  new_pane = ptyxis_pane_new_for_split (source);
+  g_object_ref_sink (new_pane);
+  ptyxis_tab_connect_pane (self, new_pane);
+
+  old_parent = gtk_widget_get_parent (GTK_WIDGET (source));
+  g_object_ref (source);
+  if (GTK_IS_PANED (old_parent))
+    {
+      was_start = gtk_paned_get_start_child (GTK_PANED (old_parent)) == GTK_WIDGET (source);
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (old_parent), NULL);
+      else
+        gtk_paned_set_end_child (GTK_PANED (old_parent), NULL);
+    }
+  else
+    gtk_widget_unparent (GTK_WIDGET (source));
+
+  paned = gtk_paned_new (direction == PTYXIS_SPLIT_HORIZONTAL
+                         ? GTK_ORIENTATION_HORIZONTAL
+                         : GTK_ORIENTATION_VERTICAL);
+  gtk_paned_set_start_child (GTK_PANED (paned), GTK_WIDGET (source));
+  gtk_paned_set_end_child (GTK_PANED (paned), GTK_WIDGET (new_pane));
+
+  if (GTK_IS_PANED (old_parent))
+    {
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (old_parent), paned);
+      else
+        gtk_paned_set_end_child (GTK_PANED (old_parent), paned);
+    }
+  else
+    gtk_widget_set_parent (paned, GTK_WIDGET (self));
+  g_object_unref (source);
+
+  ptyxis_split_node_split (leaf, direction, ratio, G_OBJECT (new_pane));
+  g_signal_connect (paned,
+                    "notify::position",
+                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
+                    leaf);
+  gtk_widget_add_tick_callback (paned, ptyxis_tab_apply_split_ratio_cb, leaf, NULL);
+  ptyxis_tab_update_split_sizing (self);
+
+  return g_steal_pointer (&new_pane);
+}
+
 static void
 ptyxis_tab_split_action (GtkWidget  *widget,
                          const char *action_name,
@@ -869,12 +951,7 @@ ptyxis_tab_split_action (GtkWidget  *widget,
 {
   PtyxisTab *self = PTYXIS_TAB (widget);
   g_autoptr(PtyxisPane) new_pane = NULL;
-  PtyxisSplitNode *leaf;
   PtyxisSplitDirection direction;
-  GtkWidget *old_parent;
-  GtkWidget *paned;
-  int split_extent;
-  gboolean was_start = FALSE;
 
   if (PTYXIS_IS_WINDOW (gtk_widget_get_root (widget)) &&
       ptyxis_window_get_single_terminal_mode (PTYXIS_WINDOW (gtk_widget_get_root (widget))))
@@ -889,55 +966,8 @@ ptyxis_tab_split_action (GtkWidget  *widget,
     direction = g_str_equal (action_name, "tab.split-horizontal")
               ? PTYXIS_SPLIT_HORIZONTAL
               : PTYXIS_SPLIT_VERTICAL;
-  leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (self->active_pane));
-  g_return_if_fail (leaf != NULL);
-
-  split_extent = direction == PTYXIS_SPLIT_HORIZONTAL
-               ? gtk_widget_get_width (GTK_WIDGET (self->active_pane))
-               : gtk_widget_get_height (GTK_WIDGET (self->active_pane));
-
-  new_pane = ptyxis_pane_new_for_split (self->active_pane);
-  g_object_ref_sink (new_pane);
-  ptyxis_tab_connect_pane (self, new_pane);
-
-  old_parent = gtk_widget_get_parent (GTK_WIDGET (self->active_pane));
-  g_object_ref (self->active_pane);
-  if (GTK_IS_PANED (old_parent))
-    {
-      was_start = gtk_paned_get_start_child (GTK_PANED (old_parent)) == GTK_WIDGET (self->active_pane);
-      if (was_start)
-        gtk_paned_set_start_child (GTK_PANED (old_parent), NULL);
-      else
-        gtk_paned_set_end_child (GTK_PANED (old_parent), NULL);
-    }
-  else
-    gtk_widget_unparent (GTK_WIDGET (self->active_pane));
-
-  paned = gtk_paned_new (direction == PTYXIS_SPLIT_HORIZONTAL
-                         ? GTK_ORIENTATION_HORIZONTAL
-                         : GTK_ORIENTATION_VERTICAL);
-  gtk_paned_set_start_child (GTK_PANED (paned), GTK_WIDGET (self->active_pane));
-  gtk_paned_set_end_child (GTK_PANED (paned), GTK_WIDGET (new_pane));
-  if (split_extent > 1)
-    gtk_paned_set_position (GTK_PANED (paned), split_extent / 2);
-
-  if (GTK_IS_PANED (old_parent))
-    {
-      if (was_start)
-        gtk_paned_set_start_child (GTK_PANED (old_parent), paned);
-      else
-        gtk_paned_set_end_child (GTK_PANED (old_parent), paned);
-    }
-  else
-    gtk_widget_set_parent (paned, GTK_WIDGET (self));
-  g_object_unref (self->active_pane);
-
-  ptyxis_split_node_split (leaf, direction, .5, G_OBJECT (new_pane));
-  g_signal_connect (paned,
-                    "notify::position",
-                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
-                    leaf);
-  ptyxis_tab_update_split_sizing (self);
+  new_pane = ptyxis_tab_split_pane (self, self->active_pane, direction, .5);
+  g_return_if_fail (new_pane != NULL);
   ptyxis_tab_set_active_pane (self, new_pane);
   ptyxis_tab_update_scrollback_lines (self);
   ptyxis_tab_update_cell_height_scale (self);
@@ -1084,8 +1114,14 @@ ptyxis_tab_map (GtkWidget *widget)
 
   GTK_WIDGET_CLASS (ptyxis_tab_parent_class)->map (widget);
 
-  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_INITIAL)
-    ptyxis_tab_respawn (self);
+  for (guint i = 0; i < ptyxis_split_node_count_leaves (self->split_root); i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+
+      if (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_INITIAL)
+        ptyxis_tab_respawn_pane (self, pane);
+    }
 }
 
 static void
@@ -2133,6 +2169,123 @@ ptyxis_tab_serialize_layout (PtyxisTab *self)
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
   return ptyxis_tab_serialize_node (self->split_root);
+}
+
+typedef struct
+{
+  const char *active_uuid;
+  PtyxisPane *active_pane;
+} PtyxisTabRestoreState;
+
+static gboolean
+ptyxis_tab_restore_node (PtyxisTab             *self,
+                         PtyxisPane            *pane,
+                         GVariant              *layout,
+                         PtyxisTabRestoreState *state)
+{
+  const char *type;
+
+  if (!g_variant_lookup (layout, "type", "&s", &type))
+    return FALSE;
+
+  if (g_str_equal (type, "pane"))
+    {
+      g_autoptr(PtyxisIpcContainer) container = NULL;
+      g_autoptr(PtyxisProfile) profile = NULL;
+      const char *container_id = NULL;
+      const char *cwd = NULL;
+      const char *profile_uuid = NULL;
+      const char *title = NULL;
+      const char *uuid = NULL;
+      guint32 zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
+
+      g_variant_lookup (layout, "uuid", "&s", &uuid);
+      g_variant_lookup (layout, "profile", "&s", &profile_uuid);
+      g_variant_lookup (layout, "container", "&s", &container_id);
+      g_variant_lookup (layout, "cwd", "&s", &cwd);
+      g_variant_lookup (layout, "window-title", "&s", &title);
+      g_variant_lookup (layout, "zoom", "u", &zoom);
+
+      if (!ptyxis_str_empty0 (profile_uuid))
+        profile = ptyxis_application_dup_profile (PTYXIS_APPLICATION_DEFAULT, profile_uuid);
+      if (profile != NULL)
+        {
+          ptyxis_pane_set_profile (pane, profile);
+          g_signal_group_set_target (ptyxis_pane_get_profile_signals (pane), profile);
+        }
+
+      if (!ptyxis_str_empty0 (container_id))
+        container = ptyxis_application_lookup_container (PTYXIS_APPLICATION_DEFAULT, container_id);
+      if (container != NULL)
+        ptyxis_pane_set_container (pane, container);
+      if (cwd != NULL)
+        ptyxis_pane_set_previous_working_directory_uri (pane, cwd);
+      if (title != NULL)
+        ptyxis_pane_set_initial_title (pane, title);
+      if (zoom > 0 && zoom < PTYXIS_ZOOM_LEVEL_LAST)
+        ptyxis_pane_set_zoom (pane, zoom);
+
+      ptyxis_tab_set_active_pane (self, pane);
+      ptyxis_tab_update_scrollback_lines (self);
+      ptyxis_tab_update_cell_height_scale (self);
+      ptyxis_tab_update_cell_width_scale (self);
+      ptyxis_tab_update_custom_links (self);
+      ptyxis_tab_apply_zoom (self);
+
+      if (state->active_uuid != NULL && g_strcmp0 (uuid, state->active_uuid) == 0)
+        state->active_pane = pane;
+
+      return TRUE;
+    }
+  else
+    {
+      g_autoptr(GVariant) first = NULL;
+      g_autoptr(GVariant) second = NULL;
+      g_autoptr(PtyxisPane) second_pane = NULL;
+      PtyxisSplitDirection direction;
+      double ratio = .5;
+
+      if (g_str_equal (type, "horizontal"))
+        direction = PTYXIS_SPLIT_HORIZONTAL;
+      else if (g_str_equal (type, "vertical"))
+        direction = PTYXIS_SPLIT_VERTICAL;
+      else
+        return FALSE;
+
+      first = g_variant_lookup_value (layout, "first", G_VARIANT_TYPE_VARDICT);
+      second = g_variant_lookup_value (layout, "second", G_VARIANT_TYPE_VARDICT);
+      g_variant_lookup (layout, "ratio", "d", &ratio);
+      if (first == NULL || second == NULL)
+        return FALSE;
+
+      second_pane = ptyxis_tab_split_pane (self, pane, direction, ratio);
+      if (second_pane == NULL)
+        return FALSE;
+
+      return ptyxis_tab_restore_node (self, pane, first, state) &&
+             ptyxis_tab_restore_node (self, second_pane, second, state);
+    }
+}
+
+gboolean
+ptyxis_tab_restore_layout (PtyxisTab  *self,
+                           GVariant   *layout,
+                           const char *active_pane_uuid)
+{
+  PtyxisTabRestoreState state = { active_pane_uuid, NULL };
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
+  g_return_val_if_fail (layout != NULL, FALSE);
+  g_return_val_if_fail (g_variant_is_of_type (layout, G_VARIANT_TYPE_VARDICT), FALSE);
+  g_return_val_if_fail (ptyxis_tab_get_n_panes (self) == 1, FALSE);
+
+  if (!ptyxis_tab_restore_node (self, self->pane, layout, &state))
+    return FALSE;
+
+  if (state.active_pane != NULL)
+    ptyxis_tab_set_active_pane (self, state.active_pane);
+
+  return TRUE;
 }
 
 /**

@@ -53,6 +53,9 @@ void                ptyxis_tab_get_grid_size                      (PtyxisTab    
                                                                    guint                *columns,
                                                                    guint                *rows);
 GVariant           *ptyxis_tab_serialize_layout                   (PtyxisTab            *self);
+gboolean            ptyxis_tab_restore_layout                     (PtyxisTab            *self,
+                                                                   GVariant             *layout,
+                                                                   const char           *active_pane_uuid);
 PtyxisTerminal     *ptyxis_tab_get_terminal                       (PtyxisTab            *self);
 PtyxisProfile      *ptyxis_tab_get_profile                        (PtyxisTab            *self);
 void                ptyxis_tab_apply_profile                      (PtyxisTab            *self,

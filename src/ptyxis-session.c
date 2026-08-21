@@ -37,7 +37,7 @@ ptyxis_session_save (PtyxisApplication *app)
   g_return_val_if_fail (PTYXIS_IS_APPLICATION (app), NULL);
 
   g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-  g_variant_builder_add_parsed (&builder, "{'version', <%u>}", 1);
+  g_variant_builder_add_parsed (&builder, "{'version', <%u>}", 2);
   g_variant_builder_open (&builder, G_VARIANT_TYPE ("{sv}"));
   g_variant_builder_add (&builder, "s", "windows");
   g_variant_builder_open (&builder, G_VARIANT_TYPE ("v"));
@@ -79,6 +79,7 @@ ptyxis_session_save (PtyxisApplication *app)
                 {
                   PtyxisTab *tab = PTYXIS_TAB (adw_tab_page_get_child (page));
                   g_autoptr(PtyxisIpcContainer) container = NULL;
+                  g_autoptr(GVariant) layout = NULL;
                   g_autofree char *default_container = NULL;
                   g_autofree char *cwd = NULL;
                   PtyxisTerminal *terminal;
@@ -100,6 +101,7 @@ ptyxis_session_save (PtyxisApplication *app)
                   is_active = ptyxis_window_get_active_tab (window) == tab;
 
                   terminal = ptyxis_tab_get_terminal (tab);
+                  layout = ptyxis_tab_serialize_layout (tab);
                   ptyxis_tab_get_grid_size (tab, &columns, &rows);
                   cwd = ptyxis_terminal_dup_current_directory_uri (terminal);
                   zoom = ptyxis_tab_get_zoom (tab);
@@ -126,6 +128,10 @@ ptyxis_session_save (PtyxisApplication *app)
                   if (zoom != PTYXIS_ZOOM_LEVEL_DEFAULT)
                     g_variant_builder_add_parsed (&builder, "{'zoom', <%u>}", zoom);
                   g_variant_builder_add_parsed (&builder, "{'active', <%b>}", is_active);
+                  g_variant_builder_add (&builder, "{sv}", "active-pane",
+                                         g_variant_new_string (ptyxis_pane_get_uuid (ptyxis_tab_get_active_pane (tab))));
+                  g_variant_builder_add (&builder, "{sv}", "layout",
+                                         layout);
                   if (!ptyxis_str_empty0 (window_title))
                     g_variant_builder_add_parsed (&builder, "{'window-title', <%s>}", window_title);
                   if (!ptyxis_str_empty0 (cwd))
@@ -205,12 +211,14 @@ ptyxis_session_restore (PtyxisApplication *app,
           const char *container;
           const char *cwd;
           const char *window_title;
+          const char *active_pane_uuid;
           PtyxisTab *the_tab;
           guint32 zoom;
           gboolean is_active;
           gboolean pinned;
           guint32 columns;
           guint32 rows;
+          g_autoptr(GVariant) layout = NULL;
 
           if (!g_variant_lookup (tab, "profile", "&s", &profile))
             profile = NULL;
@@ -233,6 +241,12 @@ ptyxis_session_restore (PtyxisApplication *app,
 
           if (!g_variant_lookup (tab, "window-title", "&s", &window_title))
             window_title = NULL;
+
+          if (!g_variant_lookup (tab, "active-pane", "&s", &active_pane_uuid))
+            active_pane_uuid = NULL;
+
+          if (version >= 2)
+            layout = g_variant_lookup_value (tab, "layout", G_VARIANT_TYPE_VARDICT);
 
           if (!g_variant_lookup (tab, "active", "b", &is_active))
             is_active = FALSE;
@@ -270,6 +284,9 @@ ptyxis_session_restore (PtyxisApplication *app,
 
           if (zoom != PTYXIS_ZOOM_LEVEL_DEFAULT)
             ptyxis_tab_set_zoom (the_tab, zoom);
+
+          if (layout != NULL)
+            ptyxis_tab_restore_layout (the_tab, layout, active_pane_uuid);
 
           ptyxis_window_add_tab_at_end (the_window, the_tab);
           ptyxis_window_set_tab_pinned (the_window, the_tab, pinned);
