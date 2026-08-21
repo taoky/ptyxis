@@ -28,6 +28,7 @@ struct _PtyxisPane
   PtyxisPaneState state : 3;
   gint64 respawn_time;
   guint forced_exit : 1;
+  guint ignore_osc_title : 1;
   guint has_foreground_process : 1;
 };
 
@@ -35,6 +36,7 @@ enum {
   PROP_0,
   PROP_COMMAND_LINE,
   PROP_HAS_FOREGROUND_PROCESS,
+  PROP_IGNORE_OSC_TITLE,
   PROP_PROCESS_LEADER_KIND,
   PROP_PROFILE,
   PROP_PROCESS,
@@ -101,6 +103,10 @@ ptyxis_pane_get_property (GObject    *object,
       g_value_set_boolean (value, self->has_foreground_process);
       break;
 
+    case PROP_IGNORE_OSC_TITLE:
+      g_value_set_boolean (value, self->ignore_osc_title);
+      break;
+
     case PROP_PROCESS_LEADER_KIND:
       g_value_set_enum (value, self->leader_kind);
       break;
@@ -144,6 +150,10 @@ ptyxis_pane_set_property (GObject      *object,
 
   switch (prop_id)
     {
+    case PROP_IGNORE_OSC_TITLE:
+      ptyxis_pane_set_ignore_osc_title (self, g_value_get_boolean (value));
+      break;
+
     case PROP_PROFILE:
       ptyxis_pane_set_profile (self, g_value_get_object (value));
       break;
@@ -178,6 +188,11 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
   properties[PROP_HAS_FOREGROUND_PROCESS] =
     g_param_spec_boolean ("has-foreground-process", NULL, NULL, FALSE,
                           (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  properties[PROP_IGNORE_OSC_TITLE] =
+    g_param_spec_boolean ("ignore-osc-title", NULL, NULL, FALSE,
+                          (G_PARAM_READWRITE |
+                           G_PARAM_EXPLICIT_NOTIFY |
+                           G_PARAM_STATIC_STRINGS));
   properties[PROP_PROCESS_LEADER_KIND] =
     g_param_spec_enum ("process-leader-kind", NULL, NULL,
                        PTYXIS_TYPE_PROCESS_LEADER_KIND,
@@ -537,6 +552,27 @@ ptyxis_pane_set_read_only (PtyxisPane *self,
     {
       vte_terminal_set_input_enabled (VTE_TERMINAL (self->terminal), !read_only);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_READ_ONLY]);
+    }
+}
+
+gboolean
+ptyxis_pane_get_ignore_osc_title (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), FALSE);
+  return self->ignore_osc_title;
+}
+
+void
+ptyxis_pane_set_ignore_osc_title (PtyxisPane *self,
+                                  gboolean    ignore_osc_title)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+
+  ignore_osc_title = !!ignore_osc_title;
+  if (self->ignore_osc_title != ignore_osc_title)
+    {
+      self->ignore_osc_title = ignore_osc_title;
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
     }
 }
 

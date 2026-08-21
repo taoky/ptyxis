@@ -127,6 +127,9 @@ void            ptyxis_pane_set_forced_exit  (PtyxisPane *self,
 gboolean        ptyxis_pane_get_read_only    (PtyxisPane *self);
 void            ptyxis_pane_set_read_only    (PtyxisPane *self,
                                                gboolean    read_only);
+gboolean        ptyxis_pane_get_ignore_osc_title (PtyxisPane *self);
+void            ptyxis_pane_set_ignore_osc_title (PtyxisPane *self,
+                                                   gboolean    ignore_osc_title);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 

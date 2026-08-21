@@ -54,7 +54,6 @@ struct _PtyxisTab
   PtyxisTabNotify          notify;
   GSignalGroup            *profile_signals;
 
-  guint                    ignore_osc_title : 1;
   guint                    ignore_snapshot : 1;
 
   guint                    inhibit_cookie;
@@ -1608,7 +1607,7 @@ ptyxis_tab_dup_title (PtyxisTab *self)
 
   gstr = g_string_new (ptyxis_pane_get_title_prefix (self->pane));
 
-  if (!self->ignore_osc_title)
+  if (!ptyxis_pane_get_ignore_osc_title (self->pane))
     {
       const char *window_title;
 
@@ -2505,7 +2504,7 @@ ptyxis_tab_get_ignore_osc_title (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
 
-  return self->ignore_osc_title;
+  return ptyxis_pane_get_ignore_osc_title (self->pane);
 }
 
 void
@@ -2516,9 +2515,9 @@ ptyxis_tab_set_ignore_osc_title (PtyxisTab *self,
 
   ignore_osc_title = !!ignore_osc_title;
 
-  if (ignore_osc_title != self->ignore_osc_title)
+  if (ignore_osc_title != ptyxis_pane_get_ignore_osc_title (self->pane))
     {
-      self->ignore_osc_title = ignore_osc_title;
+      ptyxis_pane_set_ignore_osc_title (self->pane, ignore_osc_title);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
     }
