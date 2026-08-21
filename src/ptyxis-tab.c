@@ -93,6 +93,10 @@ static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_apply_zoom (PtyxisTab *self);
 static void ptyxis_tab_remove_pane (PtyxisTab *self, PtyxisPane *pane);
+static void ptyxis_tab_update_scrollback_lines (PtyxisTab *self);
+static void ptyxis_tab_update_cell_height_scale (PtyxisTab *self);
+static void ptyxis_tab_update_cell_width_scale (PtyxisTab *self);
+static void ptyxis_tab_update_custom_links (PtyxisTab *self);
 
 static void
 ptyxis_tab_update_split_sizing (PtyxisTab *self)
@@ -293,6 +297,37 @@ ptyxis_tab_connect_pane (PtyxisTab  *self,
                            G_CALLBACK (ptyxis_tab_invalidate_progress), self, G_CONNECT_SWAPPED);
   g_signal_connect_object (terminal, "match-clicked",
                            G_CALLBACK (ptyxis_tab_match_clicked_cb), self, G_CONNECT_SWAPPED);
+
+  g_signal_connect_object (ptyxis_pane_get_profile_signals (pane),
+                           "bind",
+                           G_CALLBACK (ptyxis_tab_profile_signals_bind_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
+                                 "notify::limit-scrollback",
+                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
+                                 "notify::scrollback-lines",
+                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
+                                 "notify::cell-height-scale",
+                                 G_CALLBACK (ptyxis_tab_update_cell_height_scale),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
+                                 "notify::cell-width-scale",
+                                 G_CALLBACK (ptyxis_tab_update_cell_width_scale),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
+                                 "custom-links-changed",
+                                 G_CALLBACK (ptyxis_tab_update_custom_links),
+                                 self,
+                                 G_CONNECT_SWAPPED);
 }
 
 G_DEFINE_FINAL_TYPE (PtyxisTab, ptyxis_tab, GTK_TYPE_WIDGET)
@@ -1378,39 +1413,6 @@ ptyxis_tab_constructed (GObject *object)
                            G_CONNECT_SWAPPED);
   ptyxis_tab_update_scrollbar_policy (self);
 
-  /* Set up signal group for profile signals */
-  g_signal_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                           "bind",
-                           G_CALLBACK (ptyxis_tab_profile_signals_bind_cb),
-                           self,
-                           G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                                 "notify::limit-scrollback",
-                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
-                                 self,
-                                 G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                                 "notify::scrollback-lines",
-                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
-                                 self,
-                                 G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                                 "notify::cell-height-scale",
-                                 G_CALLBACK (ptyxis_tab_update_cell_height_scale),
-                                 self,
-                                 G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                                 "notify::cell-width-scale",
-                                 G_CALLBACK (ptyxis_tab_update_cell_width_scale),
-                                 self,
-                                 G_CONNECT_SWAPPED);
-  g_signal_group_connect_object (ptyxis_pane_get_profile_signals (self->pane),
-                                 "custom-links-changed",
-                                 G_CALLBACK (ptyxis_tab_update_custom_links),
-                                 self,
-                                 G_CONNECT_SWAPPED);
-  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->pane), ptyxis_tab_get_profile (self));
-
   g_signal_connect_object (settings,
                            "notify::word-char-exceptions",
                            G_CALLBACK (ptyxis_tab_update_word_char_exceptions),
@@ -1581,6 +1583,31 @@ ptyxis_tab_root (GtkWidget *widget)
 }
 
 static void
+ptyxis_tab_release_inhibits (PtyxisTab *self)
+{
+  guint n_panes;
+
+  g_assert (PTYXIS_IS_TAB (self));
+
+  if (self->split_root == NULL)
+    return;
+
+  n_panes = ptyxis_split_node_count_leaves (self->split_root);
+  for (guint i = 0; i < n_panes; i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+      guint cookie = ptyxis_pane_get_inhibit_cookie (pane);
+
+      if (cookie != 0)
+        {
+          gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT), cookie);
+          ptyxis_pane_set_inhibit_cookie (pane, 0);
+        }
+    }
+}
+
+static void
 ptyxis_tab_unroot (GtkWidget *widget)
 {
   PtyxisTab *self = PTYXIS_TAB (widget);
@@ -1588,13 +1615,7 @@ ptyxis_tab_unroot (GtkWidget *widget)
   /* Clear inhibit cookie when widget is unrooted since the window
    * reference may no longer be valid.
    */
-  if (self->pane != NULL &&
-      ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
-    {
-      gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 ptyxis_pane_get_inhibit_cookie (self->pane));
-      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
-    }
+  ptyxis_tab_release_inhibits (self);
 
   GTK_WIDGET_CLASS (ptyxis_tab_parent_class)->unroot (widget);
 }
@@ -1623,16 +1644,8 @@ ptyxis_tab_dispose (GObject *object)
 
   ptyxis_tab_force_quit (self);
 
-  /* Template disposal clears self->pane, so release application state that
-   * is keyed by the pane before disposing template children.
-   */
-  if (self->pane != NULL &&
-      ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
-    {
-      gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 ptyxis_pane_get_inhibit_cookie (self->pane));
-      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
-    }
+  /* Release application state for every pane before disposing the tree. */
+  ptyxis_tab_release_inhibits (self);
 
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
 
@@ -2029,6 +2042,11 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
       ptyxis_tab_update_scrollbar_policy (self);
       ptyxis_tab_update_padding_cb (self, NULL, settings);
       ptyxis_tab_update_word_char_exceptions (self, NULL, settings);
+      ptyxis_tab_update_scrollback_lines (self);
+      ptyxis_tab_update_cell_height_scale (self);
+      ptyxis_tab_update_cell_width_scale (self);
+      ptyxis_tab_update_custom_links (self);
+      ptyxis_tab_apply_zoom (self);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ACTIVE_PANE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
