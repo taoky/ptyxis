@@ -1484,6 +1484,18 @@ ptyxis_window_notify_zoom_cb (PtyxisWindow *self,
 }
 
 static void
+ptyxis_window_notify_active_pane_cb (PtyxisWindow *self,
+                                     GParamSpec   *pspec,
+                                     PtyxisTab    *tab)
+{
+  g_assert (PTYXIS_IS_WINDOW (self));
+  g_assert (PTYXIS_IS_TAB (tab));
+
+  if (tab == ptyxis_window_get_active_tab (self))
+    ptyxis_find_bar_set_terminal (self->find_bar, ptyxis_tab_get_terminal (tab));
+}
+
+static void
 ptyxis_window_active_tab_bind_cb (PtyxisWindow *self,
                                   PtyxisTab    *tab,
                                   GSignalGroup *signals)
@@ -1494,6 +1506,7 @@ ptyxis_window_active_tab_bind_cb (PtyxisWindow *self,
 
   ptyxis_window_notify_process_leader_kind_cb (self, NULL, tab);
   ptyxis_window_notify_zoom_cb (self, NULL, tab);
+  ptyxis_window_notify_active_pane_cb (self, NULL, tab);
 }
 
 static void
@@ -2177,6 +2190,11 @@ ptyxis_window_init (PtyxisWindow *self)
   g_signal_group_connect_object (self->active_tab_signals,
                                  "commit",
                                  G_CALLBACK (ptyxis_window_active_tab_commit_cb),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+  g_signal_group_connect_object (self->active_tab_signals,
+                                 "notify::active-pane",
+                                 G_CALLBACK (ptyxis_window_notify_active_pane_cb),
                                  self,
                                  G_CONNECT_SWAPPED);
   g_signal_group_connect_object (self->active_tab_signals,
