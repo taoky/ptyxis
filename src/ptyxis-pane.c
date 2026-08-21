@@ -51,6 +51,25 @@ enum {
 
 static GParamSpec *properties[N_PROPS];
 
+enum {
+  FOCUS_ENTERED,
+  N_SIGNALS
+};
+
+static guint signals[N_SIGNALS];
+
+static void
+ptyxis_pane_focus_changed_cb (PtyxisPane               *self,
+                              GParamSpec               *pspec,
+                              GtkEventControllerFocus  *controller)
+{
+  g_assert (PTYXIS_IS_PANE (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_FOCUS (controller));
+
+  if (gtk_event_controller_focus_contains_focus (controller))
+    g_signal_emit (self, signals[FOCUS_ENTERED], 0);
+}
+
 G_DEFINE_FINAL_TYPE (PtyxisPane, ptyxis_pane, GTK_TYPE_WIDGET)
 
 static void
@@ -234,6 +253,13 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
                         G_PARAM_EXPLICIT_NOTIFY |
                         G_PARAM_STATIC_STRINGS));
   g_object_class_install_properties (object_class, N_PROPS, properties);
+
+  signals[FOCUS_ENTERED] =
+    g_signal_new ("focus-entered",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
   gtk_widget_class_set_layout_manager_type (widget_class, GTK_TYPE_BIN_LAYOUT);
   gtk_widget_class_set_css_name (widget_class, "ptyxis-pane");
 }
@@ -241,11 +267,21 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
 static void
 ptyxis_pane_init (PtyxisPane *self)
 {
+  GtkEventController *focus;
+
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
   self->foreground_pid = -1;
   self->state = PTYXIS_PANE_STATE_INITIAL;
   self->profile_signals = g_signal_group_new (PTYXIS_TYPE_PROFILE);
+
+  focus = gtk_event_controller_focus_new ();
+  g_signal_connect_object (focus,
+                           "notify::contains-focus",
+                           G_CALLBACK (ptyxis_pane_focus_changed_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
+  gtk_widget_add_controller (GTK_WIDGET (self), focus);
 }
 
 PtyxisZoomLevel

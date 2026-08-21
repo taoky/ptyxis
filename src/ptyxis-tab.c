@@ -116,6 +116,16 @@ ptyxis_tab_focus_relative_action (GtkWidget  *widget,
     }
 }
 
+static void
+ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
+                                  PtyxisPane *pane)
+{
+  g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
+
+  ptyxis_tab_set_active_pane (self, pane);
+}
+
 G_DEFINE_FINAL_TYPE (PtyxisTab, ptyxis_tab, GTK_TYPE_WIDGET)
 
 #ifdef __linux__
@@ -1510,6 +1520,11 @@ ptyxis_tab_init (PtyxisTab *self)
   ptyxis_pane_set_terminal (self->pane, self->terminal);
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
   self->active_pane = self->pane;
+  g_signal_connect_object (self->pane,
+                           "focus-entered",
+                           G_CALLBACK (ptyxis_tab_pane_focus_entered_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
 
   ptyxis_tab_notify_init (&self->notify, self);
 
