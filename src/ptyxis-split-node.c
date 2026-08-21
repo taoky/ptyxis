@@ -122,3 +122,21 @@ ptyxis_split_node_count_leaves (PtyxisSplitNode *self)
   return ptyxis_split_node_count_leaves (self->first) +
          ptyxis_split_node_count_leaves (self->second);
 }
+
+PtyxisSplitNode *
+ptyxis_split_node_get_nth_leaf (PtyxisSplitNode *self,
+                                guint            position)
+{
+  guint first_count;
+
+  g_return_val_if_fail (self != NULL, NULL);
+
+  if (ptyxis_split_node_is_leaf (self))
+    return position == 0 ? self : NULL;
+
+  first_count = ptyxis_split_node_count_leaves (self->first);
+  if (position < first_count)
+    return ptyxis_split_node_get_nth_leaf (self->first, position);
+
+  return ptyxis_split_node_get_nth_leaf (self->second, position - first_count);
+}

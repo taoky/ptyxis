@@ -33,3 +33,11 @@ foreach test, params: testsuite
     test(test, test_exe, env: test_env)
   endif
 endforeach
+
+split_node_test = executable('test-split-node',
+  ['test-split-node.c', '../src/ptyxis-split-node.c'],
+  c_args: testsuite_c_args,
+  dependencies: dependency('gobject-2.0'),
+  include_directories: [include_directories('..'), include_directories('../src')],
+)
+test('test-split-node', split_node_test, env: test_env)
