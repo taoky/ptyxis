@@ -2891,6 +2891,14 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
                                                          result,
                                                          NULL);
 
+  /* The pane may have been closed while the agent request was in flight. */
+  if (ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) == NULL ||
+      ptyxis_pane_get_process (pane) != process)
+    {
+      g_task_return_boolean (task, FALSE);
+      return;
+    }
+
   if (ptyxis_pane_get_foreground_pid (pane) != the_pid)
     {
       changed = TRUE;
@@ -2918,10 +2926,11 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
       changed = TRUE;
       ptyxis_pane_set_process_leader_kind (pane, leader_kind);
 
-      if (!ptyxis_tab_is_active (self))
+      if (pane != self->active_pane || !ptyxis_tab_is_active (self))
         ptyxis_tab_set_needs_attention (self, TRUE);
 
-      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+      if (pane == self->active_pane)
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
     }
 
   if (g_strcmp0 (ptyxis_pane_get_command_line (pane), the_cmdline) != 0)
@@ -2941,10 +2950,11 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
           inhibit_changed = TRUE;
         }
 
-      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
+      if (pane == self->active_pane)
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
     }
 
-  if (changed)
+  if (changed && pane == self->active_pane)
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
 
   if (inhibit_changed)
