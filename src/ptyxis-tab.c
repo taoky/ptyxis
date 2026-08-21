@@ -57,6 +57,7 @@ struct _PtyxisTab
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
   PtyxisTabNotify          notify;
+  char                    *uuid;
 
   guint                    ignore_snapshot : 1;
 
@@ -1662,6 +1663,7 @@ ptyxis_tab_dispose (GObject *object)
     gtk_widget_unparent (child);
 
   g_clear_object (&self->cached_texture);
+  g_clear_pointer (&self->uuid, g_free);
   G_OBJECT_CLASS (ptyxis_tab_parent_class)->dispose (object);
 }
 
@@ -1980,6 +1982,7 @@ ptyxis_tab_init (PtyxisTab *self)
   self->scrolled_window = ptyxis_pane_get_scrolled_window (self->pane);
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
   self->active_pane = self->pane;
+  self->uuid = g_strdup (ptyxis_pane_get_uuid (self->pane));
   ptyxis_tab_connect_pane (self, self->pane);
 
   ptyxis_tab_notify_init (&self->notify, self);
@@ -2066,7 +2069,6 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SUBTITLE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE_PREFIX]);
-      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_UUID]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM_LABEL]);
       g_object_thaw_notify (G_OBJECT (self));
@@ -2798,7 +2800,7 @@ ptyxis_tab_get_uuid (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_uuid (self->active_pane);
+  return self->uuid;
 }
 
 PtyxisIpcContainer *
