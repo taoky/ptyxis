@@ -4,6 +4,8 @@
 #include "config.h"
 #include "ptyxis-split-node.h"
 
+#include <math.h>
+
 struct _PtyxisSplitNode
 {
   gatomicrefcount ref_count;
@@ -61,7 +63,7 @@ ptyxis_split_node_set_ratio (PtyxisSplitNode *self,
                              double           ratio)
 {
   g_return_if_fail (self != NULL);
-  self->ratio = CLAMP (ratio, .05, .95);
+  self->ratio = isfinite (ratio) ? CLAMP (ratio, .05, .95) : .5;
 }
 
 PtyxisSplitNode *
@@ -75,6 +77,8 @@ ptyxis_split_node_split (PtyxisSplitNode      *leaf,
 
   g_return_val_if_fail (ptyxis_split_node_is_leaf (leaf), NULL);
   g_return_val_if_fail (G_IS_OBJECT (new_pane), NULL);
+  g_return_val_if_fail (direction == PTYXIS_SPLIT_HORIZONTAL ||
+                        direction == PTYXIS_SPLIT_VERTICAL, NULL);
 
   first = ptyxis_split_node_new_leaf (leaf->pane);
   second = ptyxis_split_node_new_leaf (new_pane);

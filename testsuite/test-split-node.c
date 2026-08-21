@@ -4,6 +4,8 @@
 #include "config.h"
 #include "src/ptyxis-split-node.h"
 
+#include <math.h>
+
 static void
 test_split_and_traverse (void)
 {
@@ -76,6 +78,10 @@ test_ratio_bounds (void)
   g_assert_cmpfloat (ptyxis_split_node_get_ratio (root), ==, .95);
   ptyxis_split_node_set_ratio (root, -1.);
   g_assert_cmpfloat (ptyxis_split_node_get_ratio (root), ==, .05);
+  ptyxis_split_node_set_ratio (root, NAN);
+  g_assert_cmpfloat (ptyxis_split_node_get_ratio (root), ==, .5);
+  ptyxis_split_node_set_ratio (root, INFINITY);
+  g_assert_cmpfloat (ptyxis_split_node_get_ratio (root), ==, .5);
 }
 
 int
