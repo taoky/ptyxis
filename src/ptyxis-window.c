@@ -311,12 +311,65 @@ ptyxis_window_focus_active_tab_cb (gpointer data)
 }
 
 static void
+ptyxis_window_update_overview_page_title (PtyxisWindow *self,
+                                          PtyxisTab    *tab)
+{
+  g_autofree char *title = NULL;
+  AdwTabPage *page;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+  g_assert (PTYXIS_IS_TAB (tab));
+
+  page = adw_tab_view_get_page (self->tab_view, GTK_WIDGET (tab));
+  if (page == NULL)
+    return;
+
+  if (adw_tab_overview_get_open (self->tab_overview))
+    title = ptyxis_tab_dup_overview_title (tab);
+  else
+    title = ptyxis_tab_dup_title (tab);
+
+  adw_tab_page_set_title (page, title);
+}
+
+static void
+ptyxis_window_update_overview_titles (PtyxisWindow *self)
+{
+  guint n_pages;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+
+  n_pages = adw_tab_view_get_n_pages (self->tab_view);
+  for (guint i = 0; i < n_pages; i++)
+    {
+      AdwTabPage *page = adw_tab_view_get_nth_page (self->tab_view, i);
+      PtyxisTab *tab = PTYXIS_TAB (adw_tab_page_get_child (page));
+
+      ptyxis_window_update_overview_page_title (self, tab);
+    }
+}
+
+static void
+ptyxis_window_tab_search_text_changed_cb (PtyxisWindow *self,
+                                          GParamSpec   *pspec,
+                                          PtyxisTab    *tab)
+{
+  g_assert (PTYXIS_IS_WINDOW (self));
+  g_assert (PTYXIS_IS_TAB (tab));
+
+  if (adw_tab_overview_get_open (self->tab_overview))
+    ptyxis_window_update_overview_page_title (self, tab);
+}
+
+static void
 ptyxis_window_tab_overview_notify_open_cb (PtyxisWindow   *self,
                                            GParamSpec     *pspec,
                                            AdwTabOverview *tab_overview)
 {
   g_assert (PTYXIS_IS_WINDOW (self));
   g_assert (ADW_IS_TAB_OVERVIEW (tab_overview));
+
+  ptyxis_window_update_overview_titles (self);
 
   /* For some reason when we get here the selected page is not
    * getting focused. So work around libadwaita by deferring the
@@ -2399,6 +2452,12 @@ ptyxis_window_setup_page (PtyxisWindow *self,
   g_object_bind_property (tab, "search-text", page, "keyword", G_BINDING_SYNC_CREATE);
   g_object_bind_property (tab, "icon", page, "icon", G_BINDING_SYNC_CREATE);
   g_object_bind_property (tab, "indicator-icon", page, "indicator-icon", G_BINDING_SYNC_CREATE);
+  g_signal_handlers_disconnect_by_func (tab,
+                                        G_CALLBACK (ptyxis_window_tab_search_text_changed_cb),
+                                        self);
+  g_signal_connect_object (tab, "notify::search-text",
+                           G_CALLBACK (ptyxis_window_tab_search_text_changed_cb),
+                           self, G_CONNECT_SWAPPED);
 }
 
 void

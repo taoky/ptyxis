@@ -2537,8 +2537,9 @@ ptyxis_tab_dup_title (PtyxisTab *self)
   return ptyxis_tab_dup_pane_title (self->active_pane);
 }
 
-char *
-ptyxis_tab_dup_search_text (PtyxisTab *self)
+static char *
+ptyxis_tab_dup_pane_titles (PtyxisTab *self,
+                            const char *separator)
 {
   g_autoptr(GString) search_text = NULL;
   guint n_panes;
@@ -2555,11 +2556,27 @@ ptyxis_tab_dup_search_text (PtyxisTab *self)
       g_autofree char *title = ptyxis_tab_dup_pane_title (pane);
 
       if (search_text->len > 0)
-        g_string_append_c (search_text, ' ');
+        g_string_append (search_text, separator);
       g_string_append (search_text, title);
     }
 
   return g_string_free (g_steal_pointer (&search_text), FALSE);
+}
+
+char *
+ptyxis_tab_dup_search_text (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  return ptyxis_tab_dup_pane_titles (self, " ");
+}
+
+char *
+ptyxis_tab_dup_overview_title (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  return ptyxis_tab_dup_pane_titles (self, " · ");
 }
 
 static char *

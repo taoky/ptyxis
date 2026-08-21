@@ -69,6 +69,7 @@ GIcon              *ptyxis_tab_dup_indicator_icon                 (PtyxisTab    
 char               *ptyxis_tab_dup_subtitle                       (PtyxisTab            *self);
 char               *ptyxis_tab_dup_title                          (PtyxisTab            *self);
 char               *ptyxis_tab_dup_search_text                    (PtyxisTab            *self);
+char               *ptyxis_tab_dup_overview_title                 (PtyxisTab            *self);
 gboolean            ptyxis_tab_get_ignore_osc_title               (PtyxisTab            *self);
 void                ptyxis_tab_set_ignore_osc_title               (PtyxisTab            *self,
                                                                    gboolean              ignore_osc_title);
