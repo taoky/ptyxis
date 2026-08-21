@@ -2101,7 +2101,7 @@ ptyxis_tab_get_title_prefix (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_title_prefix (self->pane) ?: "";
+  return ptyxis_pane_get_title_prefix (self->active_pane) ?: "";
 }
 
 void
@@ -2113,9 +2113,9 @@ ptyxis_tab_set_title_prefix (PtyxisTab  *self,
   if (ptyxis_str_empty0 (title_prefix))
     title_prefix = NULL;
 
-  if (g_strcmp0 (ptyxis_pane_get_title_prefix (self->pane), title_prefix) != 0)
+  if (g_strcmp0 (ptyxis_pane_get_title_prefix (self->active_pane), title_prefix) != 0)
     {
-      ptyxis_pane_set_title_prefix (self->pane, title_prefix);
+      ptyxis_pane_set_title_prefix (self->active_pane, title_prefix);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE_PREFIX]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
     }
@@ -2125,40 +2125,44 @@ char *
 ptyxis_tab_dup_title (PtyxisTab *self)
 {
   GString *gstr;
+  PtyxisPane *pane;
+  PtyxisTerminal *terminal;
 
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  gstr = g_string_new (ptyxis_pane_get_title_prefix (self->pane));
+  pane = self->active_pane;
+  terminal = ptyxis_pane_get_terminal (pane);
+  gstr = g_string_new (ptyxis_pane_get_title_prefix (pane));
 
-  if (!ptyxis_pane_get_ignore_osc_title (self->pane))
+  if (!ptyxis_pane_get_ignore_osc_title (pane))
     {
       const char *window_title;
 
       G_GNUC_BEGIN_IGNORE_DEPRECATIONS
-        window_title = vte_terminal_get_window_title (VTE_TERMINAL (self->terminal));
+        window_title = vte_terminal_get_window_title (VTE_TERMINAL (terminal));
       G_GNUC_END_IGNORE_DEPRECATIONS
 
       if (window_title && window_title[0])
         g_string_append (gstr, window_title);
-      else if (ptyxis_pane_get_command (self->pane) != NULL &&
-               ptyxis_pane_get_command (self->pane)[0] != NULL)
-        g_string_append (gstr, ptyxis_pane_get_command (self->pane)[0]);
-      else if (ptyxis_pane_get_initial_title (self->pane) != NULL)
-        g_string_append (gstr, ptyxis_pane_get_initial_title (self->pane));
+      else if (ptyxis_pane_get_command (pane) != NULL &&
+               ptyxis_pane_get_command (pane)[0] != NULL)
+        g_string_append (gstr, ptyxis_pane_get_command (pane)[0]);
+      else if (ptyxis_pane_get_initial_title (pane) != NULL)
+        g_string_append (gstr, ptyxis_pane_get_initial_title (pane));
     }
 
   if (gstr->len == 0)
     g_string_append (gstr, _("Terminal"));
 
-  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED)
+  if (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_EXITED)
     g_string_append_printf (gstr, " (%s)", _("Exited"));
-  else if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED)
+  else if (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_FAILED)
     g_string_append_printf (gstr, " (%s)", _("Failed"));
-  else if (ptyxis_pane_get_has_foreground_process (self->pane) &&
-           !ptyxis_str_empty0 (ptyxis_pane_get_command_line (self->pane)) &&
-           !ptyxis_str_empty0 (ptyxis_pane_get_program_name (self->pane)) &&
-           !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane)))
-    g_string_append_printf (gstr, " — %s", ptyxis_pane_get_command_line (self->pane));
+  else if (ptyxis_pane_get_has_foreground_process (pane) &&
+           !ptyxis_str_empty0 (ptyxis_pane_get_command_line (pane)) &&
+           !ptyxis_str_empty0 (ptyxis_pane_get_program_name (pane)) &&
+           !ptyxis_is_shell (ptyxis_pane_get_program_name (pane)))
+    g_string_append_printf (gstr, " — %s", ptyxis_pane_get_command_line (pane));
 
   return g_string_free (gstr, FALSE);
 }
