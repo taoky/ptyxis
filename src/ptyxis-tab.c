@@ -50,6 +50,7 @@ struct _PtyxisTab
   GdkTexture              *cached_texture;
   AdwBanner               *banner;
   PtyxisPane              *pane;
+  PtyxisPane              *active_pane;
   PtyxisSplitNode         *split_root;
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
@@ -1175,6 +1176,7 @@ ptyxis_tab_dispose (GObject *object)
 
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
 
+  self->active_pane = NULL;
   g_clear_pointer (&self->split_root, ptyxis_split_node_unref);
 
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
@@ -1195,7 +1197,7 @@ ptyxis_tab_get_property (GObject    *object,
   switch (prop_id)
     {
     case PROP_ACTIVE_PANE:
-      g_value_set_object (value, self->pane);
+      g_value_set_object (value, self->active_pane);
       break;
 
     case PROP_COMMAND_LINE:
@@ -1479,6 +1481,7 @@ ptyxis_tab_init (PtyxisTab *self)
 
   ptyxis_pane_set_terminal (self->pane, self->terminal);
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
+  self->active_pane = self->pane;
 
   ptyxis_tab_notify_init (&self->notify, self);
 
@@ -1522,7 +1525,22 @@ PtyxisPane *
 ptyxis_tab_get_active_pane (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
-  return self->pane;
+  return self->active_pane;
+}
+
+void
+ptyxis_tab_set_active_pane (PtyxisTab  *self,
+                            PtyxisPane *pane)
+{
+  g_return_if_fail (PTYXIS_IS_TAB (self));
+  g_return_if_fail (PTYXIS_IS_PANE (pane));
+  g_return_if_fail (ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) != NULL);
+
+  if (self->active_pane != pane)
+    {
+      self->active_pane = pane;
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ACTIVE_PANE]);
+    }
 }
 
 PtyxisSplitNode *
@@ -1550,10 +1568,10 @@ ptyxis_tab_get_profile (PtyxisTab *self)
    * The construct-only profile property is applied after instance init and
    * will notify the binding once the pane is available.
    */
-  if (self->pane == NULL)
+  if (self->active_pane == NULL)
     return NULL;
 
-  return ptyxis_pane_get_profile (self->pane);
+  return ptyxis_pane_get_profile (self->active_pane);
 }
 
 /**
@@ -1578,8 +1596,8 @@ ptyxis_tab_apply_profile (PtyxisTab     *self,
     return;
 
   /* Replace the profile with the selected one. */
-  ptyxis_pane_set_profile (self->pane, new_profile);
-  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->pane), new_profile);
+  ptyxis_pane_set_profile (self->active_pane, new_profile);
+  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->active_pane), new_profile);
 
   /* Notify that the profile property changed */
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
@@ -1728,8 +1746,8 @@ ptyxis_tab_apply_zoom (PtyxisTab *self)
 {
   g_assert (PTYXIS_IS_TAB (self));
 
-  vte_terminal_set_font_scale (VTE_TERMINAL (self->terminal),
-                               zoom_font_scales[ptyxis_pane_get_zoom (self->pane)]);
+  vte_terminal_set_font_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)),
+                               zoom_font_scales[ptyxis_pane_get_zoom (self->active_pane)]);
 }
 
 PtyxisZoomLevel
@@ -1737,7 +1755,7 @@ ptyxis_tab_get_zoom (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), 0);
 
-  return ptyxis_pane_get_zoom (self->pane);
+  return ptyxis_pane_get_zoom (self->active_pane);
 }
 
 void
@@ -1748,9 +1766,9 @@ ptyxis_tab_set_zoom (PtyxisTab       *self,
   g_return_if_fail (zoom >= PTYXIS_ZOOM_LEVEL_MINUS_14 &&
                     zoom <= PTYXIS_ZOOM_LEVEL_PLUS_14);
 
-  if (zoom != ptyxis_pane_get_zoom (self->pane))
+  if (zoom != ptyxis_pane_get_zoom (self->active_pane))
     {
-      ptyxis_pane_set_zoom (self->pane, zoom);
+      ptyxis_pane_set_zoom (self->active_pane, zoom);
       ptyxis_tab_apply_zoom (self);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM_LABEL]);
@@ -1780,7 +1798,7 @@ ptyxis_tab_get_terminal (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_terminal (self->pane);
+  return ptyxis_pane_get_terminal (self->active_pane);
 }
 
 void
@@ -1912,10 +1930,10 @@ ptyxis_tab_get_process (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  if (self->pane == NULL)
+  if (self->active_pane == NULL)
     return NULL;
 
-  return ptyxis_pane_get_process (self->pane);
+  return ptyxis_pane_get_process (self->active_pane);
 }
 
 char *

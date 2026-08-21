@@ -140,3 +140,21 @@ ptyxis_split_node_get_nth_leaf (PtyxisSplitNode *self,
 
   return ptyxis_split_node_get_nth_leaf (self->second, position - first_count);
 }
+
+PtyxisSplitNode *
+ptyxis_split_node_find_pane (PtyxisSplitNode *self,
+                             GObject         *pane)
+{
+  PtyxisSplitNode *match;
+
+  g_return_val_if_fail (self != NULL, NULL);
+  g_return_val_if_fail (G_IS_OBJECT (pane), NULL);
+
+  if (ptyxis_split_node_is_leaf (self))
+    return self->pane == pane ? self : NULL;
+
+  if ((match = ptyxis_split_node_find_pane (self->first, pane)))
+    return match;
+
+  return ptyxis_split_node_find_pane (self->second, pane);
+}

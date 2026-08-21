@@ -34,6 +34,8 @@ gboolean         ptyxis_split_node_remove        (PtyxisSplitNode      *leaf);
 guint            ptyxis_split_node_count_leaves  (PtyxisSplitNode      *self);
 PtyxisSplitNode *ptyxis_split_node_get_nth_leaf  (PtyxisSplitNode      *self,
                                                    guint                 position);
+PtyxisSplitNode *ptyxis_split_node_find_pane     (PtyxisSplitNode      *self,
+                                                   GObject              *pane);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PtyxisSplitNode, ptyxis_split_node_unref)
 

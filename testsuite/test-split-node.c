@@ -10,6 +10,7 @@ test_split_and_traverse (void)
   g_autoptr(GObject) a = g_object_new (G_TYPE_OBJECT, NULL);
   g_autoptr(GObject) b = g_object_new (G_TYPE_OBJECT, NULL);
   g_autoptr(GObject) c = g_object_new (G_TYPE_OBJECT, NULL);
+  g_autoptr(GObject) missing = g_object_new (G_TYPE_OBJECT, NULL);
   g_autoptr(PtyxisSplitNode) root = ptyxis_split_node_new_leaf (a);
   PtyxisSplitNode *first;
 
@@ -22,6 +23,9 @@ test_split_and_traverse (void)
   g_assert_true (ptyxis_split_node_get_pane (ptyxis_split_node_get_nth_leaf (root, 1)) == c);
   g_assert_true (ptyxis_split_node_get_pane (ptyxis_split_node_get_nth_leaf (root, 2)) == b);
   g_assert_null (ptyxis_split_node_get_nth_leaf (root, 3));
+  g_assert_true (ptyxis_split_node_find_pane (root, c) ==
+                 ptyxis_split_node_get_nth_leaf (root, 1));
+  g_assert_null (ptyxis_split_node_find_pane (root, missing));
   g_assert_true (ptyxis_split_node_get_parent (first) == root);
 }
 

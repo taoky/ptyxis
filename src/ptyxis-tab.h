@@ -45,6 +45,8 @@ G_DECLARE_FINAL_TYPE (PtyxisTab, ptyxis_tab, PTYXIS, TAB, GtkWidget)
 
 PtyxisTab          *ptyxis_tab_new                                (PtyxisProfile        *profile);
 PtyxisPane         *ptyxis_tab_get_active_pane                    (PtyxisTab            *self);
+void                ptyxis_tab_set_active_pane                    (PtyxisTab            *self,
+                                                                   PtyxisPane           *pane);
 PtyxisSplitNode    *ptyxis_tab_get_split_root                     (PtyxisTab            *self);
 PtyxisTerminal     *ptyxis_tab_get_terminal                       (PtyxisTab            *self);
 PtyxisProfile      *ptyxis_tab_get_profile                        (PtyxisTab            *self);
