@@ -795,9 +795,15 @@ ptyxis_tab_split_action (GtkWidget  *widget,
       ptyxis_window_get_single_terminal_mode (PTYXIS_WINDOW (gtk_widget_get_root (widget))))
     return;
 
-  direction = g_str_equal (action_name, "tab.split-horizontal")
-            ? PTYXIS_SPLIT_HORIZONTAL
-            : PTYXIS_SPLIT_VERTICAL;
+  if (g_str_equal (action_name, "tab.split-auto"))
+    direction = gtk_widget_get_width (GTK_WIDGET (self->active_pane)) >=
+                gtk_widget_get_height (GTK_WIDGET (self->active_pane))
+              ? PTYXIS_SPLIT_HORIZONTAL
+              : PTYXIS_SPLIT_VERTICAL;
+  else
+    direction = g_str_equal (action_name, "tab.split-horizontal")
+              ? PTYXIS_SPLIT_HORIZONTAL
+              : PTYXIS_SPLIT_VERTICAL;
   leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (self->active_pane));
   g_return_if_fail (leaf != NULL);
 
@@ -1807,6 +1813,8 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
   gtk_widget_class_install_action (widget_class, "tab.split-horizontal", NULL,
                                    ptyxis_tab_split_action);
   gtk_widget_class_install_action (widget_class, "tab.split-vertical", NULL,
+                                   ptyxis_tab_split_action);
+  gtk_widget_class_install_action (widget_class, "tab.split-auto", NULL,
                                    ptyxis_tab_split_action);
   gtk_widget_class_install_action (widget_class, "tab.close-pane", NULL,
                                    ptyxis_tab_close_pane_action);

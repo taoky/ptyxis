@@ -124,6 +124,9 @@ struct _PtyxisPreferencesWindow
   PtyxisShortcutRow    *shortcut_search;
   PtyxisShortcutRow    *shortcut_select_all;
   PtyxisShortcutRow    *shortcut_select_none;
+  PtyxisShortcutRow    *shortcut_split_auto;
+  PtyxisShortcutRow    *shortcut_split_horizontal;
+  PtyxisShortcutRow    *shortcut_split_vertical;
   PtyxisShortcutRow    *shortcut_tab_overview;
   PtyxisShortcutRow    *shortcut_toggle_fullscreen;
   PtyxisShortcutRow    *shortcut_undo_close_tab;
@@ -933,6 +936,15 @@ ptyxis_preferences_window_constructed (GObject *object)
   g_object_bind_property (shortcuts, "new-window",
                           self->shortcut_new_window, "accelerator",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "split-auto",
+                          self->shortcut_split_auto, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "split-horizontal",
+                          self->shortcut_split_horizontal, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "split-vertical",
+                          self->shortcut_split_vertical, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
   g_object_bind_property (shortcuts, "tab-overview",
                           self->shortcut_tab_overview, "accelerator",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
@@ -1212,6 +1224,9 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_search);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_select_all);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_select_none);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_split_auto);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_split_horizontal);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_split_vertical);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_tab_overview);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_toggle_fullscreen);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_undo_close_tab);

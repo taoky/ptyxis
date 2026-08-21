@@ -431,6 +431,24 @@
       <description>The shortcut to create a new tab in a new window</description>
     </key>
 
+    <key name="split-auto" type="s">
+      <default>'&lt;ctrl&gt;&lt;alt&gt;a'</default>
+      <summary>Split Pane Automatically</summary>
+      <description>The shortcut to split the active pane based on its dimensions</description>
+    </key>
+
+    <key name="split-horizontal" type="s">
+      <default>'&lt;ctrl&gt;&lt;alt&gt;d'</default>
+      <summary>Split Pane Horizontally</summary>
+      <description>The shortcut to split the active pane horizontally</description>
+    </key>
+
+    <key name="split-vertical" type="s">
+      <default>'&lt;ctrl&gt;&lt;alt&gt;r'</default>
+      <summary>Split Pane Vertically</summary>
+      <description>The shortcut to split the active pane vertically</description>
+    </key>
+
     <key name="tab-overview" type="s">
       <default>'&lt;ctrl&gt;&lt;shift&gt;o'</default>
       <summary>Tab Overview</summary>

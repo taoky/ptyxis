@@ -107,6 +107,36 @@
             <property name="arguments">true</property>
           </object>
         </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="split-auto" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.split-auto)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="split-horizontal" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.split-horizontal)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="split-vertical" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.split-vertical)</property>
+          </object>
+        </child>
       </object>
     </child>
     <child>

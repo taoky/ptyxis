@@ -788,6 +788,29 @@
         </child>
         <child>
           <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Panes</property>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_split_auto">
+                <property name="title" translatable="yes">Split Automatically</property>
+                <property name="shortcut-name">split-auto</property>
+              </object>
+            </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_split_horizontal">
+                <property name="title" translatable="yes">Split Horizontally</property>
+                <property name="shortcut-name">split-horizontal</property>
+              </object>
+            </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_split_vertical">
+                <property name="title" translatable="yes">Split Vertically</property>
+                <property name="shortcut-name">split-vertical</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
             <child>
               <object class="PtyxisShortcutRow" id="shortcut_tab_overview">
                 <property name="title" translatable="yes">View Tab Overview</property>
