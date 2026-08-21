@@ -788,6 +788,7 @@ ptyxis_tab_split_action (GtkWidget  *widget,
   PtyxisSplitDirection direction;
   GtkWidget *old_parent;
   GtkWidget *paned;
+  int split_extent;
   gboolean was_start = FALSE;
 
   if (PTYXIS_IS_WINDOW (gtk_widget_get_root (widget)) &&
@@ -799,6 +800,10 @@ ptyxis_tab_split_action (GtkWidget  *widget,
             : PTYXIS_SPLIT_VERTICAL;
   leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (self->active_pane));
   g_return_if_fail (leaf != NULL);
+
+  split_extent = direction == PTYXIS_SPLIT_HORIZONTAL
+               ? gtk_widget_get_width (GTK_WIDGET (self->active_pane))
+               : gtk_widget_get_height (GTK_WIDGET (self->active_pane));
 
   new_pane = ptyxis_pane_new_for_split (self->active_pane);
   g_object_ref_sink (new_pane);
@@ -822,6 +827,8 @@ ptyxis_tab_split_action (GtkWidget  *widget,
                          : GTK_ORIENTATION_VERTICAL);
   gtk_paned_set_start_child (GTK_PANED (paned), GTK_WIDGET (self->active_pane));
   gtk_paned_set_end_child (GTK_PANED (paned), GTK_WIDGET (new_pane));
+  if (split_extent > 1)
+    gtk_paned_set_position (GTK_PANED (paned), split_extent / 2);
 
   if (GTK_IS_PANED (old_parent))
     {
