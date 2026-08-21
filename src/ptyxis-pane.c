@@ -3,6 +3,7 @@
  */
 #include "config.h"
 #include <adwaita.h>
+#include <signal.h>
 #include "ptyxis-enums.h"
 #include "ptyxis-pane.h"
 #include "ptyxis-tab-monitor.h"
@@ -61,6 +62,16 @@ enum {
 };
 
 static guint signals[N_SIGNALS];
+
+static gboolean
+ptyxis_pane_force_quit_in_idle (gpointer data)
+{
+  PtyxisPane *self = data;
+
+  if (self->process != NULL)
+    ptyxis_ipc_process_call_send_signal (self->process, SIGKILL, NULL, NULL, NULL);
+  return G_SOURCE_REMOVE;
+}
 
 static void
 ptyxis_pane_focus_changed_cb (PtyxisPane               *self,
@@ -616,6 +627,21 @@ ptyxis_pane_set_forced_exit (PtyxisPane *self,
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
   self->forced_exit = !!forced_exit;
+}
+
+void
+ptyxis_pane_force_quit (PtyxisPane *self)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+
+  self->forced_exit = TRUE;
+  if (self->process == NULL)
+    return;
+
+  ptyxis_ipc_process_call_send_signal (self->process, SIGHUP, NULL, NULL, NULL);
+  g_timeout_add_full (G_PRIORITY_HIGH, 50,
+                      ptyxis_pane_force_quit_in_idle,
+                      g_object_ref (self), g_object_unref);
 }
 
 gboolean

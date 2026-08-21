@@ -32,6 +32,7 @@
 
 #include "ptyxis-agent-ipc.h"
 #include "ptyxis-application.h"
+#include "ptyxis-close-dialog.h"
 #include "ptyxis-enums.h"
 #include "ptyxis-inspector.h"
 #include "ptyxis-pane.h"
@@ -90,6 +91,7 @@ enum {
 static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_apply_zoom (PtyxisTab *self);
+static void ptyxis_tab_remove_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
@@ -314,26 +316,6 @@ on_scroll_end_cb (GtkEventControllerScroll *scroll,
   g_assert (PTYXIS_IS_TAB (self));
 
   gtk_event_controller_scroll_set_flags (scroll, GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
-}
-
-static void
-ptyxis_tab_send_signal (PtyxisTab *self,
-                        int        signum)
-{
-  g_autofree char *title = NULL;
-
-  g_assert (PTYXIS_IS_TAB (self));
-
-  if (ptyxis_tab_get_process (self) == NULL)
-    {
-      g_debug ("Cannot send signal %d to tab, process is gone.", signum);
-      return;
-    }
-
-  title = ptyxis_tab_dup_title (self);
-  g_debug ("Sending signal %d to tab \"%s\"", signum, title);
-
-  ptyxis_ipc_process_call_send_signal (ptyxis_tab_get_process (self), signum, NULL, NULL, NULL);
 }
 
 static gboolean
@@ -812,6 +794,101 @@ ptyxis_tab_split_action (GtkWidget  *widget,
   ptyxis_tab_apply_zoom (self);
   ptyxis_tab_respawn_pane (self, new_pane);
   gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (new_pane)));
+}
+
+static void
+ptyxis_tab_remove_pane (PtyxisTab  *self,
+                        PtyxisPane *pane)
+{
+  PtyxisSplitNode *leaf;
+  PtyxisSplitNode *next;
+  GtkPaned *paned;
+  GtkWidget *grandparent;
+  GtkWidget *sibling;
+  gboolean was_start = FALSE;
+
+  leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane));
+  g_return_if_fail (leaf != NULL && ptyxis_split_node_get_parent (leaf) != NULL);
+  next = ptyxis_split_node_get_next_leaf (self->split_root, leaf, FALSE);
+  if (next == NULL)
+    next = ptyxis_split_node_get_previous_leaf (self->split_root, leaf, FALSE);
+
+  paned = GTK_PANED (gtk_widget_get_parent (GTK_WIDGET (pane)));
+  grandparent = gtk_widget_get_parent (GTK_WIDGET (paned));
+  sibling = gtk_paned_get_start_child (paned) == GTK_WIDGET (pane)
+          ? gtk_paned_get_end_child (paned)
+          : gtk_paned_get_start_child (paned);
+  g_object_ref (sibling);
+  gtk_paned_set_start_child (paned, NULL);
+  gtk_paned_set_end_child (paned, NULL);
+
+  if (GTK_IS_PANED (grandparent))
+    {
+      was_start = gtk_paned_get_start_child (GTK_PANED (grandparent)) == GTK_WIDGET (paned);
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (grandparent), NULL);
+      else
+        gtk_paned_set_end_child (GTK_PANED (grandparent), NULL);
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (grandparent), sibling);
+      else
+        gtk_paned_set_end_child (GTK_PANED (grandparent), sibling);
+    }
+  else
+    {
+      gtk_widget_unparent (GTK_WIDGET (paned));
+      gtk_widget_set_parent (sibling, GTK_WIDGET (self));
+    }
+  g_object_unref (sibling);
+
+  ptyxis_tab_set_active_pane (self, PTYXIS_PANE (ptyxis_split_node_get_pane (next)));
+  ptyxis_pane_force_quit (pane);
+  ptyxis_split_node_remove (leaf);
+  gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (self->active_pane)));
+}
+
+static void
+ptyxis_tab_close_pane_dialog_cb (GObject      *object,
+                                 GAsyncResult *result,
+                                 gpointer      user_data)
+{
+  g_autoptr(PtyxisTabPaneCall) call = user_data;
+  g_autoptr(GError) error = NULL;
+
+  if (_ptyxis_close_dialog_run_finish (result, &error))
+    ptyxis_tab_remove_pane (call->tab, call->pane);
+}
+
+static void
+ptyxis_tab_close_pane_action (GtkWidget  *widget,
+                              const char *action_name,
+                              GVariant   *params)
+{
+  PtyxisTab *self = PTYXIS_TAB (widget);
+  PtyxisSettings *settings;
+
+  if (ptyxis_split_node_count_leaves (self->split_root) == 1)
+    {
+      GtkWidget *view = gtk_widget_get_ancestor (widget, ADW_TYPE_TAB_VIEW);
+      AdwTabPage *page = adw_tab_view_get_page (ADW_TAB_VIEW (view), widget);
+      adw_tab_view_close_page (ADW_TAB_VIEW (view), page);
+      return;
+    }
+
+  settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+  if (ptyxis_tab_is_running (self, NULL) && ptyxis_settings_get_prompt_on_close (settings))
+    {
+      g_autoptr(GPtrArray) tabs = g_ptr_array_new_with_free_func (g_object_unref);
+      GtkWindow *window = GTK_WINDOW (gtk_widget_get_root (widget));
+
+      g_ptr_array_add (tabs, g_object_ref (self));
+      _ptyxis_close_dialog_run_async (window, tabs, NULL,
+                                      ptyxis_tab_close_pane_dialog_cb,
+                                      ptyxis_tab_pane_call_new (self, self->active_pane));
+      return;
+    }
+
+  ptyxis_tab_remove_pane (self, self->active_pane);
 }
 
 
@@ -1680,6 +1757,8 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
                                    ptyxis_tab_split_action);
   gtk_widget_class_install_action (widget_class, "tab.split-vertical", NULL,
                                    ptyxis_tab_split_action);
+  gtk_widget_class_install_action (widget_class, "tab.close-pane", NULL,
+                                   ptyxis_tab_close_pane_action);
 
   g_type_ensure (PTYXIS_TYPE_TERMINAL);
   g_type_ensure (PTYXIS_TYPE_PANE);
@@ -2119,19 +2198,6 @@ ptyxis_tab_is_running (PtyxisTab  *self,
   return FALSE;
 }
 
-static gboolean
-ptyxis_tab_force_quit_in_idle (gpointer data)
-{
-  PtyxisTab *self = data;
-
-  g_assert (PTYXIS_IS_TAB (self));
-
-  if (ptyxis_tab_get_process (self) != NULL)
-    ptyxis_tab_send_signal (self, SIGKILL);
-
-  return G_SOURCE_REMOVE;
-}
-
 void
 ptyxis_tab_force_quit (PtyxisTab *self)
 {
@@ -2139,24 +2205,11 @@ ptyxis_tab_force_quit (PtyxisTab *self)
 
   g_debug ("Forcing tab to quit");
 
-  ptyxis_pane_set_forced_exit (self->pane, TRUE);
-
-  if (ptyxis_tab_get_process (self) == NULL)
-    return;
-
-  /* First we try to send SIGHUP so that shells like bash will save their
-   * history (See #308).
-   */
-  ptyxis_tab_send_signal (self, SIGHUP);
-
-  /* In case this was not enough for the process to actually exit, we setup
-   * a short timer to send SIGKILL afterwards.
-   */
-  g_timeout_add_full (G_PRIORITY_HIGH,
-                      50,
-                      ptyxis_tab_force_quit_in_idle,
-                      g_object_ref (self),
-                      g_object_unref);
+  for (guint i = 0; i < ptyxis_split_node_count_leaves (self->split_root); i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      ptyxis_pane_force_quit (PTYXIS_PANE (ptyxis_split_node_get_pane (leaf)));
+    }
 }
 
 PtyxisIpcProcess *
