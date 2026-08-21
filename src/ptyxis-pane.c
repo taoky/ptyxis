@@ -9,6 +9,7 @@ struct _PtyxisPane
 {
   GtkWidget parent_instance;
   PtyxisProfile *profile;
+  PtyxisIpcProcess *process;
   PtyxisTerminal *terminal;
   PtyxisZoomLevel zoom;
 };
@@ -16,6 +17,7 @@ struct _PtyxisPane
 enum {
   PROP_0,
   PROP_PROFILE,
+  PROP_PROCESS,
   PROP_ZOOM,
   N_PROPS
 };
@@ -32,6 +34,7 @@ ptyxis_pane_dispose (GObject *object)
 
   self->terminal = NULL;
   g_clear_object (&self->profile);
+  g_clear_object (&self->process);
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
 
@@ -50,6 +53,10 @@ ptyxis_pane_get_property (GObject    *object,
     {
     case PROP_PROFILE:
       g_value_set_object (value, self->profile);
+      break;
+
+    case PROP_PROCESS:
+      g_value_set_object (value, self->process);
       break;
 
     case PROP_ZOOM:
@@ -100,6 +107,11 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
                          (G_PARAM_READWRITE |
                           G_PARAM_EXPLICIT_NOTIFY |
                           G_PARAM_STATIC_STRINGS));
+  properties[PROP_PROCESS] =
+    g_param_spec_object ("process", NULL, NULL,
+                         PTYXIS_IPC_TYPE_PROCESS,
+                         (G_PARAM_READABLE |
+                          G_PARAM_STATIC_STRINGS));
   properties[PROP_ZOOM] =
     g_param_spec_enum ("zoom", NULL, NULL,
                        PTYXIS_TYPE_ZOOM_LEVEL,
@@ -138,6 +150,24 @@ ptyxis_pane_set_zoom (PtyxisPane      *self,
       self->zoom = zoom;
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
     }
+}
+
+PtyxisIpcProcess *
+ptyxis_pane_get_process (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->process;
+}
+
+void
+ptyxis_pane_set_process (PtyxisPane       *self,
+                         PtyxisIpcProcess *process)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (process == NULL || PTYXIS_IPC_IS_PROCESS (process));
+
+  if (g_set_object (&self->process, process))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS]);
 }
 
 PtyxisPane *

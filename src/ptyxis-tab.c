@@ -57,7 +57,6 @@ struct _PtyxisTab
 
   char                    *initial_working_directory_uri;
   char                    *previous_working_directory_uri;
-  PtyxisIpcProcess        *process;
   char                    *title_prefix;
   PtyxisTabMonitor        *monitor;
   char                    *uuid;
@@ -231,7 +230,7 @@ ptyxis_tab_send_signal (PtyxisTab *self,
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (self->process == NULL)
+  if (ptyxis_tab_get_process (self) == NULL)
     {
       g_debug ("Cannot send signal %d to tab, process is gone.", signum);
       return;
@@ -240,7 +239,7 @@ ptyxis_tab_send_signal (PtyxisTab *self,
   title = ptyxis_tab_dup_title (self);
   g_debug ("Sending signal %d to tab \"%s\"", signum, title);
 
-  ptyxis_ipc_process_call_send_signal (self->process, signum, NULL, NULL, NULL);
+  ptyxis_ipc_process_call_send_signal (ptyxis_tab_get_process (self), signum, NULL, NULL, NULL);
 }
 
 static gboolean
@@ -384,7 +383,7 @@ ptyxis_tab_wait_cb (GObject      *object,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (self->state == PTYXIS_TAB_STATE_RUNNING);
 
-  g_clear_object (&self->process);
+  ptyxis_pane_set_process (self->pane, NULL);
 
   /* Update inhibit state when process exits */
   ptyxis_tab_update_inhibit (self);
@@ -513,7 +512,7 @@ ptyxis_tab_spawn_cb (GObject      *object,
   self->state = PTYXIS_TAB_STATE_RUNNING;
   self->respawn_time = g_get_monotonic_time ();
 
-  g_set_object (&self->process, process);
+  ptyxis_pane_set_process (self->pane, process);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
 
@@ -1191,7 +1190,6 @@ ptyxis_tab_dispose (GObject *object)
 
   g_clear_object (&self->cached_texture);
   g_clear_object (&self->profile_signals);
-  g_clear_object (&self->process);
   g_clear_object (&self->monitor);
   g_clear_object (&self->container_at_creation);
 
@@ -1906,7 +1904,7 @@ ptyxis_tab_force_quit_in_idle (gpointer data)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (self->process != NULL)
+  if (ptyxis_tab_get_process (self) != NULL)
     ptyxis_tab_send_signal (self, SIGKILL);
 
   return G_SOURCE_REMOVE;
@@ -1921,7 +1919,7 @@ ptyxis_tab_force_quit (PtyxisTab *self)
 
   self->forced_exit = TRUE;
 
-  if (self->process == NULL)
+  if (ptyxis_tab_get_process (self) == NULL)
     return;
 
   /* First we try to send SIGHUP so that shells like bash will save their
@@ -1944,7 +1942,10 @@ ptyxis_tab_get_process (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->process;
+  if (self->pane == NULL)
+    return NULL;
+
+  return ptyxis_pane_get_process (self->pane);
 }
 
 char *
@@ -2125,7 +2126,7 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_source_tag (task, ptyxis_tab_poll_agent_async);
 
-  if (self->process == NULL)
+  if (ptyxis_tab_get_process (self) == NULL)
     {
       self->has_foreground_process = FALSE;
       self->pid = -1;
@@ -2149,7 +2150,7 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
   fd_list = g_unix_fd_list_new ();
   handle = g_unix_fd_list_append (fd_list, pty_fd, NULL);
 
-  ptyxis_ipc_process_call_has_foreground_process (self->process,
+  ptyxis_ipc_process_call_has_foreground_process (ptyxis_tab_get_process (self),
                                                   g_variant_new_handle (handle),
                                                   fd_list,
                                                   cancellable,
@@ -2356,7 +2357,7 @@ ptyxis_tab_query_working_directory_from_agent (PtyxisTab *self)
 
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  if (self->process == NULL)
+  if (ptyxis_tab_get_process (self) == NULL)
     return NULL;
 
   pty = vte_terminal_get_pty (VTE_TERMINAL (self->terminal));
@@ -2364,7 +2365,7 @@ ptyxis_tab_query_working_directory_from_agent (PtyxisTab *self)
   fd_list = g_unix_fd_list_new ();
   handle = g_unix_fd_list_append (fd_list, pty_fd, NULL);
 
-  if (ptyxis_ipc_process_call_get_working_directory_sync (self->process,
+  if (ptyxis_ipc_process_call_get_working_directory_sync (ptyxis_tab_get_process (self),
                                                           g_variant_new_handle (handle),
                                                           fd_list,
                                                           &path,

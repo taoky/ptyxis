@@ -4,6 +4,7 @@
 #pragma once
 
 #include <gtk/gtk.h>
+#include "ptyxis-agent-ipc.h"
 #include "ptyxis-profile.h"
 #include "ptyxis-terminal.h"
 
@@ -55,6 +56,9 @@ void            ptyxis_pane_set_profile  (PtyxisPane     *self,
 PtyxisZoomLevel ptyxis_pane_get_zoom     (PtyxisPane     *self);
 void            ptyxis_pane_set_zoom     (PtyxisPane     *self,
                                            PtyxisZoomLevel zoom);
+PtyxisIpcProcess *ptyxis_pane_get_process (PtyxisPane     *self);
+void              ptyxis_pane_set_process (PtyxisPane     *self,
+                                            PtyxisIpcProcess *process);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 
