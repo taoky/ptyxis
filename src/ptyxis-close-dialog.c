@@ -134,33 +134,40 @@ _ptyxis_close_dialog_new (GtkWindow *parent,
   for (guint i = 0; i < tabs->len; i++)
     {
       PtyxisTab *tab = g_ptr_array_index (tabs, i);
-      g_autofree char *cmdline = NULL;
-      g_autofree char *title = NULL;
-      g_autofree char *subtitle = NULL;
-      GtkWidget *row;
+      g_autoptr(GPtrArray) running_panes = NULL;
       SaveRequest sr;
-      GPid pid;
 
-      if (ptyxis_tab_has_foreground_process (tab, &pid, &cmdline))
+      if (pane != NULL)
         {
-          g_utf8_make_valid (cmdline, -1);
-          title = g_steal_pointer (&cmdline);
-          subtitle = g_strdup_printf (_("Process %d"), pid);
+          running_panes = g_ptr_array_new_with_free_func (g_object_unref);
+          g_ptr_array_add (running_panes, g_object_ref (pane));
         }
       else
+        running_panes = ptyxis_tab_list_running_panes (tab);
+
+      for (guint j = 0; j < running_panes->len; j++)
         {
-          title = ptyxis_tab_dup_title (tab);
-          subtitle = ptyxis_tab_dup_subtitle (tab);
+          PtyxisPane *running_pane = g_ptr_array_index (running_panes, j);
+          g_autofree char *title = NULL;
+          g_autofree char *subtitle = NULL;
+          const char *cmdline = ptyxis_pane_get_command_line (running_pane);
+          GtkWidget *row;
+
+          if (!ptyxis_str_empty0 (cmdline))
+            title = g_utf8_make_valid (cmdline, -1);
+          else
+            title = g_strdup (_("Terminal"));
+          subtitle = g_strdup_printf (_("Process %d"),
+                                      ptyxis_pane_get_foreground_pid (running_pane));
+
+          if (g_utf8_strlen (title, -1) > 200)
+            g_utf8_offset_to_pointer (title, 200)[0] = 0;
+
+          row = adw_action_row_new ();
+          adw_preferences_row_set_title (ADW_PREFERENCES_ROW (row), title);
+          adw_action_row_set_subtitle (ADW_ACTION_ROW (row), subtitle);
+          adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), row);
         }
-
-      if (g_utf8_strlen (title, -1) > 200)
-        g_utf8_offset_to_pointer (title, 200)[0] = 0;
-
-      row = adw_action_row_new ();
-
-      adw_preferences_row_set_title (ADW_PREFERENCES_ROW (row), title);
-      adw_action_row_set_subtitle (ADW_ACTION_ROW (row), subtitle);
-      adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), row);
 
       sr.tab = g_object_ref (tab);
       sr.pane = pane != NULL ? g_object_ref (pane) : NULL;

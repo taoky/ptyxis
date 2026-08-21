@@ -89,6 +89,7 @@ char               *ptyxis_tab_dup_zoom_label                     (PtyxisTab    
 void                ptyxis_tab_raise                              (PtyxisTab            *self);
 gboolean            ptyxis_tab_is_running                         (PtyxisTab            *self,
                                                                    char                **cmdline);
+GPtrArray          *ptyxis_tab_list_running_panes                 (PtyxisTab            *self);
 void                ptyxis_tab_force_quit                         (PtyxisTab            *self);
 void                ptyxis_tab_show_banner                        (PtyxisTab            *self);
 void                ptyxis_tab_set_needs_attention                (PtyxisTab            *self,

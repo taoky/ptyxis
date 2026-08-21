@@ -2692,6 +2692,31 @@ ptyxis_tab_is_running (PtyxisTab  *self,
   return FALSE;
 }
 
+GPtrArray *
+ptyxis_tab_list_running_panes (PtyxisTab *self)
+{
+  GPtrArray *panes;
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  panes = g_ptr_array_new_with_free_func (g_object_unref);
+
+  for (guint i = 0; i < ptyxis_split_node_count_leaves (self->split_root); i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+
+      ptyxis_tab_poll_pane_agent (self, pane);
+
+      if (ptyxis_pane_get_has_foreground_process (pane) &&
+          !ptyxis_str_empty0 (ptyxis_pane_get_program_name (pane)) &&
+          !ptyxis_is_shell (ptyxis_pane_get_program_name (pane)))
+        g_ptr_array_add (panes, g_object_ref (pane));
+    }
+
+  return panes;
+}
+
 void
 ptyxis_tab_force_quit (PtyxisTab *self)
 {
