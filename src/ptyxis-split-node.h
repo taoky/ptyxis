@@ -36,6 +36,12 @@ PtyxisSplitNode *ptyxis_split_node_get_nth_leaf  (PtyxisSplitNode      *self,
                                                    guint                 position);
 PtyxisSplitNode *ptyxis_split_node_find_pane     (PtyxisSplitNode      *self,
                                                    GObject              *pane);
+PtyxisSplitNode *ptyxis_split_node_get_next_leaf (PtyxisSplitNode      *root,
+                                                   PtyxisSplitNode      *leaf,
+                                                   gboolean              wrap);
+PtyxisSplitNode *ptyxis_split_node_get_previous_leaf (PtyxisSplitNode  *root,
+                                                       PtyxisSplitNode  *leaf,
+                                                       gboolean          wrap);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (PtyxisSplitNode, ptyxis_split_node_unref)
 

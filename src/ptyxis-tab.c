@@ -92,6 +92,30 @@ static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
 
+static void
+ptyxis_tab_focus_relative_action (GtkWidget  *widget,
+                                  const char *action_name,
+                                  GVariant   *params)
+{
+  PtyxisTab *self = PTYXIS_TAB (widget);
+  PtyxisSplitNode *active;
+  PtyxisSplitNode *target;
+
+  active = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (self->active_pane));
+  if (g_str_equal (action_name, "tab.focus-pane-next"))
+    target = ptyxis_split_node_get_next_leaf (self->split_root, active, TRUE);
+  else
+    target = ptyxis_split_node_get_previous_leaf (self->split_root, active, TRUE);
+
+  if (target != NULL && target != active)
+    {
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (target));
+
+      ptyxis_tab_set_active_pane (self, pane);
+      gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (pane)));
+    }
+}
+
 G_DEFINE_FINAL_TYPE (PtyxisTab, ptyxis_tab, GTK_TYPE_WIDGET)
 
 #ifdef __linux__
@@ -1466,6 +1490,10 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
 
   gtk_widget_class_install_action (widget_class, "tab.respawn", NULL, ptyxis_tab_respawn_action);
   gtk_widget_class_install_action (widget_class, "tab.inspect", NULL, ptyxis_tab_inspect_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-next", NULL,
+                                   ptyxis_tab_focus_relative_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-previous", NULL,
+                                   ptyxis_tab_focus_relative_action);
 
   g_type_ensure (PTYXIS_TYPE_TERMINAL);
   g_type_ensure (PTYXIS_TYPE_PANE);

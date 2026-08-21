@@ -158,3 +158,54 @@ ptyxis_split_node_find_pane (PtyxisSplitNode *self,
 
   return ptyxis_split_node_find_pane (self->second, pane);
 }
+
+static int
+ptyxis_split_node_get_leaf_position (PtyxisSplitNode *root,
+                                     PtyxisSplitNode *leaf)
+{
+  guint n_leaves = ptyxis_split_node_count_leaves (root);
+
+  for (guint i = 0; i < n_leaves; i++)
+    {
+      if (ptyxis_split_node_get_nth_leaf (root, i) == leaf)
+        return i;
+    }
+
+  return -1;
+}
+
+PtyxisSplitNode *
+ptyxis_split_node_get_next_leaf (PtyxisSplitNode *root,
+                                 PtyxisSplitNode *leaf,
+                                 gboolean         wrap)
+{
+  guint n_leaves;
+  int position;
+
+  g_return_val_if_fail (root != NULL, NULL);
+  g_return_val_if_fail (ptyxis_split_node_is_leaf (leaf), NULL);
+  if ((position = ptyxis_split_node_get_leaf_position (root, leaf)) < 0)
+    return NULL;
+
+  n_leaves = ptyxis_split_node_count_leaves (root);
+  if ((guint)position + 1 < n_leaves)
+    return ptyxis_split_node_get_nth_leaf (root, position + 1);
+  return wrap ? ptyxis_split_node_get_nth_leaf (root, 0) : NULL;
+}
+
+PtyxisSplitNode *
+ptyxis_split_node_get_previous_leaf (PtyxisSplitNode *root,
+                                     PtyxisSplitNode *leaf,
+                                     gboolean         wrap)
+{
+  int position;
+
+  g_return_val_if_fail (root != NULL, NULL);
+  g_return_val_if_fail (ptyxis_split_node_is_leaf (leaf), NULL);
+  if ((position = ptyxis_split_node_get_leaf_position (root, leaf)) < 0)
+    return NULL;
+  if (position > 0)
+    return ptyxis_split_node_get_nth_leaf (root, position - 1);
+  return wrap ? ptyxis_split_node_get_nth_leaf (root,
+                                                ptyxis_split_node_count_leaves (root) - 1) : NULL;
+}

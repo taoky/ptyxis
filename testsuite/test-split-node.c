@@ -27,6 +27,17 @@ test_split_and_traverse (void)
                  ptyxis_split_node_get_nth_leaf (root, 1));
   g_assert_null (ptyxis_split_node_find_pane (root, missing));
   g_assert_true (ptyxis_split_node_get_parent (first) == root);
+  g_assert_true (ptyxis_split_node_get_next_leaf (
+                   root, ptyxis_split_node_get_nth_leaf (root, 0), FALSE) ==
+                 ptyxis_split_node_get_nth_leaf (root, 1));
+  g_assert_null (ptyxis_split_node_get_next_leaf (
+                   root, ptyxis_split_node_get_nth_leaf (root, 2), FALSE));
+  g_assert_true (ptyxis_split_node_get_next_leaf (
+                   root, ptyxis_split_node_get_nth_leaf (root, 2), TRUE) ==
+                 ptyxis_split_node_get_nth_leaf (root, 0));
+  g_assert_true (ptyxis_split_node_get_previous_leaf (
+                   root, ptyxis_split_node_get_nth_leaf (root, 0), TRUE) ==
+                 ptyxis_split_node_get_nth_leaf (root, 2));
 }
 
 static void
