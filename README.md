@@ -189,6 +189,10 @@ Ptyxis uses the Meson build system.
 integrated development environment. Simply open the cloned `ptyxis/` directory
 in Builder for build configuration, running, and debugging.
 
+Distribution maintainers should also read the
+[packaging guide](docs/PACKAGING.md) for Debian, Fedora, Arch Linux, and
+Flatpak-specific instructions.
+
 ---
 
 ## Basic Usage & Command-Line Options
