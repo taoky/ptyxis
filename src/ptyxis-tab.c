@@ -35,6 +35,7 @@
 #include "ptyxis-enums.h"
 #include "ptyxis-inspector.h"
 #include "ptyxis-pane.h"
+#include "ptyxis-split-node.h"
 #include "ptyxis-tab-monitor.h"
 #include "ptyxis-tab-notify.h"
 #include "ptyxis-tab-private.h"
@@ -49,6 +50,7 @@ struct _PtyxisTab
   GdkTexture              *cached_texture;
   AdwBanner               *banner;
   PtyxisPane              *pane;
+  PtyxisSplitNode         *split_root;
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
   PtyxisTabNotify          notify;
@@ -1173,6 +1175,8 @@ ptyxis_tab_dispose (GObject *object)
 
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
 
+  g_clear_pointer (&self->split_root, ptyxis_split_node_unref);
+
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
 
@@ -1474,6 +1478,7 @@ ptyxis_tab_init (PtyxisTab *self)
   gtk_widget_init_template (GTK_WIDGET (self));
 
   ptyxis_pane_set_terminal (self->pane, self->terminal);
+  self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
 
   ptyxis_tab_notify_init (&self->notify, self);
 
@@ -1518,6 +1523,13 @@ ptyxis_tab_get_active_pane (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
   return self->pane;
+}
+
+PtyxisSplitNode *
+ptyxis_tab_get_split_root (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+  return self->split_root;
 }
 
 /**
