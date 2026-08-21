@@ -57,7 +57,6 @@ struct _PtyxisTab
 
   char                    *initial_working_directory_uri;
   char                    *previous_working_directory_uri;
-  PtyxisProfile           *profile;
   PtyxisIpcProcess        *process;
   char                    *title_prefix;
   PtyxisTabMonitor        *monitor;
@@ -265,8 +264,8 @@ ptyxis_tab_update_scrollback_lines (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (ptyxis_profile_get_limit_scrollback (self->profile))
-    scrollback_lines = ptyxis_profile_get_scrollback_lines (self->profile);
+  if (ptyxis_profile_get_limit_scrollback (ptyxis_tab_get_profile (self)))
+    scrollback_lines = ptyxis_profile_get_scrollback_lines (ptyxis_tab_get_profile (self));
 
   vte_terminal_set_scrollback_lines (VTE_TERMINAL (self->terminal), scrollback_lines);
 }
@@ -278,8 +277,8 @@ ptyxis_tab_update_cell_height_scale (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (ptyxis_profile_get_cell_height_scale (self->profile))
-    cell_height_scale = ptyxis_profile_get_cell_height_scale (self->profile);
+  if (ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self)))
+    cell_height_scale = ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self));
 
   vte_terminal_set_cell_height_scale (VTE_TERMINAL (self->terminal), cell_height_scale);
 }
@@ -291,8 +290,8 @@ ptyxis_tab_update_cell_width_scale (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (ptyxis_profile_get_cell_width_scale (self->profile))
-    cell_width_scale = ptyxis_profile_get_cell_width_scale (self->profile);
+  if (ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self)))
+    cell_width_scale = ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self));
 
   vte_terminal_set_cell_width_scale (VTE_TERMINAL (self->terminal), cell_width_scale);
 }
@@ -304,7 +303,7 @@ ptyxis_tab_update_custom_links (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  custom_links_list = ptyxis_profile_list_custom_links(self->profile);
+  custom_links_list = ptyxis_profile_list_custom_links(ptyxis_tab_get_profile (self));
   ptyxis_terminal_update_custom_links_list(self->terminal, custom_links_list);
 }
 
@@ -421,7 +420,7 @@ ptyxis_tab_wait_cb (GObject      *object,
       return;
     }
 
-  exit_action = ptyxis_profile_get_exit_action (self->profile);
+  exit_action = ptyxis_profile_get_exit_action (ptyxis_tab_get_profile (self));
   tab_view = gtk_widget_get_ancestor (GTK_WIDGET (self), ADW_TYPE_TAB_VIEW);
 
   /* If this was started with something like ptyxis_window_new_for_command()
@@ -496,7 +495,7 @@ ptyxis_tab_spawn_cb (GObject      *object,
 
   if (!(process = ptyxis_application_spawn_finish (app, result, &error)))
     {
-      const char *profile_uuid = ptyxis_profile_get_uuid (self->profile);
+      const char *profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
 
       self->state = PTYXIS_TAB_STATE_FAILED;
 
@@ -545,8 +544,8 @@ ptyxis_tab_respawn (PtyxisTab *self)
   gtk_widget_set_visible (GTK_WIDGET (self->banner), FALSE);
 
   app = PTYXIS_APPLICATION_DEFAULT;
-  profile_uuid = ptyxis_profile_get_uuid (self->profile);
-  default_container = ptyxis_profile_dup_default_container (self->profile);
+  profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
+  default_container = ptyxis_profile_dup_default_container (ptyxis_tab_get_profile (self));
 
   if (self->container_at_creation != NULL)
     container = g_object_ref (self->container_at_creation);
@@ -602,7 +601,7 @@ ptyxis_tab_respawn (PtyxisTab *self)
 
   ptyxis_application_spawn_async (PTYXIS_APPLICATION_DEFAULT,
                                   container,
-                                  self->profile,
+                                  ptyxis_tab_get_profile (self),
                                   cwd_uri,
                                   pty,
                                   (const char * const *)self->command,
@@ -766,9 +765,9 @@ ptyxis_tab_dup_icon (PtyxisTab *self)
           {
             if (!g_set_object (&container, self->container_at_creation))
               {
-                if (self->profile != NULL)
+                if (ptyxis_tab_get_profile (self) != NULL)
                 {
-                  g_autofree char *profile_uuid = ptyxis_profile_dup_default_container (self->profile);
+                  g_autofree char *profile_uuid = ptyxis_profile_dup_default_container (ptyxis_tab_get_profile (self));
 
                   container = ptyxis_application_lookup_container (PTYXIS_APPLICATION_DEFAULT, profile_uuid);
                 }
@@ -964,7 +963,7 @@ ptyxis_tab_constructed (GObject *object)
                                  G_CALLBACK (ptyxis_tab_update_custom_links),
                                  self,
                                  G_CONNECT_SWAPPED);
-  g_signal_group_set_target (self->profile_signals, self->profile);
+  g_signal_group_set_target (self->profile_signals, ptyxis_tab_get_profile (self));
 
   g_signal_connect_object (settings,
                            "notify::word-char-exceptions",
@@ -1192,7 +1191,6 @@ ptyxis_tab_dispose (GObject *object)
     gtk_widget_unparent (child);
 
   g_clear_object (&self->cached_texture);
-  g_clear_object (&self->profile);
   g_clear_object (&self->profile_signals);
   g_clear_object (&self->process);
   g_clear_object (&self->monitor);
@@ -1320,7 +1318,7 @@ ptyxis_tab_set_property (GObject      *object,
       break;
 
     case PROP_PROFILE:
-      self->profile = g_value_dup_object (value);
+      ptyxis_pane_set_profile (self->pane, g_value_get_object (value));
       break;
 
     case PROP_READ_ONLY:
@@ -1583,7 +1581,7 @@ ptyxis_tab_get_profile (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->profile;
+  return ptyxis_pane_get_profile (self->pane);
 }
 
 /**
@@ -1604,15 +1602,12 @@ ptyxis_tab_apply_profile (PtyxisTab     *self,
   g_return_if_fail (PTYXIS_IS_PROFILE (new_profile));
 
   /* Don't do anything if it's already the same profile */
-  if (self->profile == new_profile)
+  if (ptyxis_tab_get_profile (self) == new_profile)
     return;
 
   /* Replace the profile with the selected one. */
-  g_clear_object (&self->profile);
-  self->profile = g_object_ref (new_profile);
-
-
-  g_signal_group_set_target (self->profile_signals, self->profile);
+  ptyxis_pane_set_profile (self->pane, new_profile);
+  g_signal_group_set_target (self->profile_signals, new_profile);
 
   /* Notify that the profile property changed */
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
@@ -2284,7 +2279,7 @@ ptyxis_tab_open_uri (PtyxisTab  *self,
 
       if (container == NULL)
         {
-          g_autofree char *default_container = ptyxis_profile_dup_default_container (self->profile);
+          g_autofree char *default_container = ptyxis_profile_dup_default_container (ptyxis_tab_get_profile (self));
           container = ptyxis_application_lookup_container (PTYXIS_APPLICATION_DEFAULT, default_container);
         }
 

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <gtk/gtk.h>
+#include "ptyxis-profile.h"
 #include "ptyxis-terminal.h"
 
 G_BEGIN_DECLS
@@ -13,6 +14,9 @@ G_DECLARE_FINAL_TYPE (PtyxisPane, ptyxis_pane, PTYXIS, PANE, GtkWidget)
 
 PtyxisPane     *ptyxis_pane_new          (void);
 PtyxisTerminal *ptyxis_pane_get_terminal (PtyxisPane     *self);
+PtyxisProfile  *ptyxis_pane_get_profile  (PtyxisPane     *self);
+void            ptyxis_pane_set_profile  (PtyxisPane     *self,
+                                           PtyxisProfile  *profile);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 
