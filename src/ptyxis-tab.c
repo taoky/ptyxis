@@ -1922,6 +1922,56 @@ ptyxis_tab_get_n_panes (PtyxisTab *self)
   return ptyxis_split_node_count_leaves (self->split_root);
 }
 
+static void
+ptyxis_tab_get_node_grid_size (PtyxisSplitNode *node,
+                               guint           *columns,
+                               guint           *rows)
+{
+  if (ptyxis_split_node_is_leaf (node))
+    {
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (node));
+      VteTerminal *terminal = VTE_TERMINAL (ptyxis_pane_get_terminal (pane));
+
+      *columns = vte_terminal_get_column_count (terminal);
+      *rows = vte_terminal_get_row_count (terminal);
+    }
+  else
+    {
+      guint first_columns;
+      guint first_rows;
+      guint second_columns;
+      guint second_rows;
+
+      ptyxis_tab_get_node_grid_size (ptyxis_split_node_get_first (node),
+                                     &first_columns, &first_rows);
+      ptyxis_tab_get_node_grid_size (ptyxis_split_node_get_second (node),
+                                     &second_columns, &second_rows);
+
+      if (ptyxis_split_node_get_direction (node) == PTYXIS_SPLIT_HORIZONTAL)
+        {
+          *columns = first_columns + second_columns;
+          *rows = MAX (first_rows, second_rows);
+        }
+      else
+        {
+          *columns = MAX (first_columns, second_columns);
+          *rows = first_rows + second_rows;
+        }
+    }
+}
+
+void
+ptyxis_tab_get_grid_size (PtyxisTab *self,
+                          guint     *columns,
+                          guint     *rows)
+{
+  g_return_if_fail (PTYXIS_IS_TAB (self));
+  g_return_if_fail (columns != NULL);
+  g_return_if_fail (rows != NULL);
+
+  ptyxis_tab_get_node_grid_size (self->split_root, columns, rows);
+}
+
 /**
  * ptyxis_tab_get_profile:
  * @self: a #PtyxisTab

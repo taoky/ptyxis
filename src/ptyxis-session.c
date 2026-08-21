@@ -100,8 +100,7 @@ ptyxis_session_save (PtyxisApplication *app)
                   is_active = ptyxis_window_get_active_tab (window) == tab;
 
                   terminal = ptyxis_tab_get_terminal (tab);
-                  columns = vte_terminal_get_column_count (VTE_TERMINAL (terminal));
-                  rows = vte_terminal_get_row_count (VTE_TERMINAL (terminal));
+                  ptyxis_tab_get_grid_size (tab, &columns, &rows);
                   cwd = ptyxis_terminal_dup_current_directory_uri (terminal);
                   zoom = ptyxis_tab_get_zoom (tab);
 
