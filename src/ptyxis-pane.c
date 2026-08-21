@@ -25,6 +25,9 @@ struct _PtyxisPane
   char *program_name;
   GPid foreground_pid;
   PtyxisProcessLeaderKind leader_kind : 3;
+  PtyxisPaneState state : 3;
+  gint64 respawn_time;
+  guint forced_exit : 1;
   guint has_foreground_process : 1;
 };
 
@@ -174,6 +177,7 @@ ptyxis_pane_init (PtyxisPane *self)
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
   self->foreground_pid = -1;
+  self->state = PTYXIS_PANE_STATE_INITIAL;
 }
 
 PtyxisZoomLevel
@@ -408,6 +412,52 @@ ptyxis_pane_set_process_leader_kind (PtyxisPane              *self,
   g_return_if_fail (kind >= PTYXIS_PROCESS_LEADER_KIND_UNKNOWN &&
                     kind <= PTYXIS_PROCESS_LEADER_KIND_CONTAINER);
   self->leader_kind = kind;
+}
+
+PtyxisPaneState
+ptyxis_pane_get_state (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), PTYXIS_PANE_STATE_FAILED);
+  return self->state;
+}
+
+void
+ptyxis_pane_set_state (PtyxisPane      *self,
+                       PtyxisPaneState  state)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (state >= PTYXIS_PANE_STATE_INITIAL && state <= PTYXIS_PANE_STATE_FAILED);
+  self->state = state;
+}
+
+gint64
+ptyxis_pane_get_respawn_time (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), 0);
+  return self->respawn_time;
+}
+
+void
+ptyxis_pane_set_respawn_time (PtyxisPane *self,
+                              gint64      respawn_time)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  self->respawn_time = respawn_time;
+}
+
+gboolean
+ptyxis_pane_get_forced_exit (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), FALSE);
+  return self->forced_exit;
+}
+
+void
+ptyxis_pane_set_forced_exit (PtyxisPane *self,
+                             gboolean    forced_exit)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  self->forced_exit = !!forced_exit;
 }
 
 PtyxisPane *

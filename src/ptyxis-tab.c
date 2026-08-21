@@ -42,15 +42,6 @@
 #include "ptyxis-util.h"
 #include "ptyxis-window.h"
 
-typedef enum _PtyxisTabState
-{
-  PTYXIS_TAB_STATE_INITIAL,
-  PTYXIS_TAB_STATE_SPAWNING,
-  PTYXIS_TAB_STATE_RUNNING,
-  PTYXIS_TAB_STATE_EXITED,
-  PTYXIS_TAB_STATE_FAILED,
-} PtyxisTabState;
-
 struct _PtyxisTab
 {
   GtkWidget                parent_instance;
@@ -63,11 +54,6 @@ struct _PtyxisTab
   PtyxisTabNotify          notify;
   GSignalGroup            *profile_signals;
 
-  PtyxisTabState           state;
-
-  gint64                   respawn_time;
-
-  guint                    forced_exit : 1;
   guint                    ignore_osc_title : 1;
   guint                    ignore_snapshot : 1;
 
@@ -368,7 +354,7 @@ ptyxis_tab_wait_cb (GObject      *object,
   g_assert (PTYXIS_IS_APPLICATION (app));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (self->state == PTYXIS_TAB_STATE_RUNNING);
+  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_RUNNING);
 
   ptyxis_pane_set_process (self->pane, NULL);
 
@@ -382,11 +368,11 @@ ptyxis_tab_wait_cb (GObject      *object,
            error ? error->message : "");
 
   if (error == NULL && WIFEXITED (exit_code) && WEXITSTATUS (exit_code) == 0)
-    self->state = PTYXIS_TAB_STATE_EXITED;
+    ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_EXITED);
   else
-    self->state = PTYXIS_TAB_STATE_FAILED;
+    ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
 
-  if (self->forced_exit)
+  if (ptyxis_pane_get_forced_exit (self->pane))
     return;
 
   if ((window = PTYXIS_WINDOW (gtk_widget_get_ancestor (GTK_WIDGET (self), PTYXIS_TYPE_WINDOW))))
@@ -430,8 +416,8 @@ ptyxis_tab_wait_cb (GObject      *object,
    * allow ourselves to auto-close in that case as it's likely an error
    * the user would want to see.
    */
-  if ((ptyxis_pane_get_command (self->pane) == NULL || self->state == PTYXIS_TAB_STATE_FAILED) &&
-      (g_get_monotonic_time () - self->respawn_time) < (G_USEC_PER_SEC/2) &&
+  if ((ptyxis_pane_get_command (self->pane) == NULL || ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED) &&
+      (g_get_monotonic_time () - ptyxis_pane_get_respawn_time (self->pane)) < (G_USEC_PER_SEC/2) &&
       !ptyxis_tab_monitor_get_has_pressed_key (ptyxis_pane_get_monitor (self->pane)))
     exit_action = PTYXIS_EXIT_ACTION_NONE;
 
@@ -476,13 +462,13 @@ ptyxis_tab_spawn_cb (GObject      *object,
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (self->state == PTYXIS_TAB_STATE_SPAWNING);
+  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_SPAWNING);
 
   if (!(process = ptyxis_application_spawn_finish (app, result, &error)))
     {
       const char *profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
 
-      self->state = PTYXIS_TAB_STATE_FAILED;
+      ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
 
       vte_terminal_feed (VTE_TERMINAL (self->terminal), error->message, -1);
       vte_terminal_feed (VTE_TERMINAL (self->terminal), "\r\n", -1);
@@ -496,8 +482,8 @@ ptyxis_tab_spawn_cb (GObject      *object,
       return;
     }
 
-  self->state = PTYXIS_TAB_STATE_RUNNING;
-  self->respawn_time = g_get_monotonic_time ();
+  ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_RUNNING);
+  ptyxis_pane_set_respawn_time (self->pane, g_get_monotonic_time ());
 
   ptyxis_pane_set_process (self->pane, process);
 
@@ -523,9 +509,9 @@ ptyxis_tab_respawn (PtyxisTab *self)
   VtePty *pty;
 
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (self->state == PTYXIS_TAB_STATE_INITIAL ||
-            self->state == PTYXIS_TAB_STATE_EXITED ||
-            self->state == PTYXIS_TAB_STATE_FAILED);
+  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_INITIAL ||
+            ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED ||
+            ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED);
 
   gtk_widget_set_visible (GTK_WIDGET (self->banner), FALSE);
 
@@ -543,7 +529,7 @@ ptyxis_tab_respawn (PtyxisTab *self)
     {
       g_autofree char *title = NULL;
 
-      self->state = PTYXIS_TAB_STATE_FAILED;
+      ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
 
       title = g_strdup_printf (_("Cannot locate container “%s”"), default_container);
       adw_banner_set_title (self->banner, title);
@@ -555,7 +541,7 @@ ptyxis_tab_respawn (PtyxisTab *self)
       return;
     }
 
-  self->state = PTYXIS_TAB_STATE_SPAWNING;
+  ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_SPAWNING);
 
   pty = vte_terminal_get_pty (VTE_TERMINAL (self->terminal));
 
@@ -567,7 +553,7 @@ ptyxis_tab_respawn (PtyxisTab *self)
 
       if (new_pty == NULL)
         {
-          self->state = PTYXIS_TAB_STATE_FAILED;
+          ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
 
           adw_banner_set_title (self->banner, _("Failed to create pseudo terminal device"));
           adw_banner_set_button_label (self->banner, NULL);
@@ -608,8 +594,8 @@ ptyxis_tab_respawn_action (GtkWidget  *widget,
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (self->state == PTYXIS_TAB_STATE_FAILED ||
-      self->state == PTYXIS_TAB_STATE_EXITED)
+  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED ||
+      ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED)
     ptyxis_tab_respawn (self);
 }
 
@@ -642,7 +628,7 @@ ptyxis_tab_map (GtkWidget *widget)
 
   GTK_WIDGET_CLASS (ptyxis_tab_parent_class)->map (widget);
 
-  if (self->state == PTYXIS_TAB_STATE_INITIAL)
+  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_INITIAL)
     ptyxis_tab_respawn (self);
 }
 
@@ -1485,7 +1471,6 @@ ptyxis_tab_init (PtyxisTab *self)
 {
   GtkEventController *controller;
 
-  self->state = PTYXIS_TAB_STATE_INITIAL;
 
   gtk_widget_init_template (GTK_WIDGET (self));
 
@@ -1643,9 +1628,9 @@ ptyxis_tab_dup_title (PtyxisTab *self)
   if (gstr->len == 0)
     g_string_append (gstr, _("Terminal"));
 
-  if (self->state == PTYXIS_TAB_STATE_EXITED)
+  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED)
     g_string_append_printf (gstr, " (%s)", _("Exited"));
-  else if (self->state == PTYXIS_TAB_STATE_FAILED)
+  else if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED)
     g_string_append_printf (gstr, " (%s)", _("Failed"));
   else if (ptyxis_pane_get_has_foreground_process (self->pane) &&
            !ptyxis_str_empty0 (ptyxis_pane_get_command_line (self->pane)) &&
@@ -1891,7 +1876,7 @@ ptyxis_tab_force_quit (PtyxisTab *self)
 
   g_debug ("Forcing tab to quit");
 
-  self->forced_exit = TRUE;
+  ptyxis_pane_set_forced_exit (self->pane, TRUE);
 
   if (ptyxis_tab_get_process (self) == NULL)
     return;

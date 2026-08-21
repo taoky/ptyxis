@@ -20,6 +20,15 @@ typedef enum _PtyxisProcessLeader
   PTYXIS_PROCESS_LEADER_KIND_CONTAINER,
 } PtyxisProcessLeaderKind;
 
+typedef enum _PtyxisPaneState
+{
+  PTYXIS_PANE_STATE_INITIAL,
+  PTYXIS_PANE_STATE_SPAWNING,
+  PTYXIS_PANE_STATE_RUNNING,
+  PTYXIS_PANE_STATE_EXITED,
+  PTYXIS_PANE_STATE_FAILED,
+} PtyxisPaneState;
+
 typedef enum _PtyxisZoomLevel
 {
   PTYXIS_ZOOM_LEVEL_MINUS_14 = 1,
@@ -106,6 +115,15 @@ void        ptyxis_pane_set_program_name (PtyxisPane *self,
 PtyxisProcessLeaderKind ptyxis_pane_get_process_leader_kind (PtyxisPane *self);
 void                    ptyxis_pane_set_process_leader_kind (PtyxisPane *self,
                                                              PtyxisProcessLeaderKind kind);
+PtyxisPaneState ptyxis_pane_get_state        (PtyxisPane *self);
+void            ptyxis_pane_set_state        (PtyxisPane *self,
+                                               PtyxisPaneState state);
+gint64          ptyxis_pane_get_respawn_time (PtyxisPane *self);
+void            ptyxis_pane_set_respawn_time (PtyxisPane *self,
+                                               gint64      respawn_time);
+gboolean        ptyxis_pane_get_forced_exit  (PtyxisPane *self);
+void            ptyxis_pane_set_forced_exit  (PtyxisPane *self,
+                                               gboolean    forced_exit);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 
