@@ -2069,6 +2069,72 @@ ptyxis_tab_get_grid_size (PtyxisTab *self,
   ptyxis_tab_get_node_grid_size (self->split_root, columns, rows);
 }
 
+static GVariant *
+ptyxis_tab_serialize_node (PtyxisSplitNode *node)
+{
+  GVariantBuilder builder;
+
+  g_variant_builder_init (&builder, G_VARIANT_TYPE_VARDICT);
+
+  if (ptyxis_split_node_is_leaf (node))
+    {
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (node));
+      PtyxisTerminal *terminal = ptyxis_pane_get_terminal (pane);
+      g_autoptr(PtyxisIpcContainer) container = ptyxis_pane_dup_container (pane);
+      g_autofree char *cwd = ptyxis_terminal_dup_current_directory_uri (terminal);
+      const char *title;
+
+      if (cwd == NULL)
+        cwd = g_strdup (ptyxis_pane_get_previous_working_directory_uri (pane));
+
+      G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+      title = vte_terminal_get_window_title (VTE_TERMINAL (terminal));
+      G_GNUC_END_IGNORE_DEPRECATIONS
+      if (ptyxis_str_empty0 (title))
+        title = ptyxis_pane_get_initial_title (pane);
+
+      g_variant_builder_add (&builder, "{sv}", "type", g_variant_new_string ("pane"));
+      g_variant_builder_add (&builder, "{sv}", "uuid",
+                             g_variant_new_string (ptyxis_pane_get_uuid (pane)));
+      g_variant_builder_add (&builder, "{sv}", "profile",
+                             g_variant_new_string (ptyxis_profile_get_uuid (ptyxis_pane_get_profile (pane))));
+      g_variant_builder_add (&builder, "{sv}", "zoom",
+                             g_variant_new_uint32 (ptyxis_pane_get_zoom (pane)));
+
+      if (container != NULL)
+        g_variant_builder_add (&builder, "{sv}", "container",
+                               g_variant_new_string (ptyxis_ipc_container_get_id (container)));
+      if (!ptyxis_str_empty0 (cwd))
+        g_variant_builder_add (&builder, "{sv}", "cwd", g_variant_new_string (cwd));
+      if (!ptyxis_str_empty0 (title))
+        g_variant_builder_add (&builder, "{sv}", "window-title", g_variant_new_string (title));
+    }
+  else
+    {
+      const char *type = ptyxis_split_node_get_direction (node) == PTYXIS_SPLIT_HORIZONTAL
+                       ? "horizontal"
+                       : "vertical";
+
+      g_variant_builder_add (&builder, "{sv}", "type", g_variant_new_string (type));
+      g_variant_builder_add (&builder, "{sv}", "ratio",
+                             g_variant_new_double (ptyxis_split_node_get_ratio (node)));
+      g_variant_builder_add (&builder, "{sv}", "first",
+                             ptyxis_tab_serialize_node (ptyxis_split_node_get_first (node)));
+      g_variant_builder_add (&builder, "{sv}", "second",
+                             ptyxis_tab_serialize_node (ptyxis_split_node_get_second (node)));
+    }
+
+  return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+GVariant *
+ptyxis_tab_serialize_layout (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  return ptyxis_tab_serialize_node (self->split_root);
+}
+
 /**
  * ptyxis_tab_get_profile:
  * @self: a #PtyxisTab
