@@ -688,6 +688,27 @@ ptyxis_pane_new (void)
   return g_object_new (PTYXIS_TYPE_PANE, NULL);
 }
 
+PtyxisPane *
+ptyxis_pane_new_for_split (PtyxisPane *source)
+{
+  PtyxisPane *self;
+  g_autofree char *cwd_uri = NULL;
+
+  g_return_val_if_fail (PTYXIS_IS_PANE (source), NULL);
+
+  self = ptyxis_pane_new ();
+  ptyxis_pane_set_profile (self, ptyxis_pane_get_profile (source));
+  ptyxis_pane_set_zoom (self, ptyxis_pane_get_zoom (source));
+
+  self->container = ptyxis_pane_dup_container (source);
+  cwd_uri = ptyxis_terminal_dup_current_directory_uri (source->terminal);
+  if (cwd_uri == NULL)
+    cwd_uri = g_strdup (ptyxis_pane_get_previous_working_directory_uri (source));
+  ptyxis_pane_set_initial_working_directory_uri (self, cwd_uri);
+
+  return self;
+}
+
 PtyxisTerminal *
 ptyxis_pane_get_terminal (PtyxisPane *self)
 {

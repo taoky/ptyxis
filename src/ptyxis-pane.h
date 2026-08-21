@@ -68,6 +68,7 @@ typedef enum _PtyxisZoomLevel
 G_DECLARE_FINAL_TYPE (PtyxisPane, ptyxis_pane, PTYXIS, PANE, GtkWidget)
 
 PtyxisPane     *ptyxis_pane_new          (void);
+PtyxisPane     *ptyxis_pane_new_for_split (PtyxisPane    *source);
 PtyxisTerminal *ptyxis_pane_get_terminal (PtyxisPane     *self);
 GtkWidget      *ptyxis_pane_get_banner   (PtyxisPane     *self);
 GtkScrolledWindow *ptyxis_pane_get_scrolled_window (PtyxisPane *self);

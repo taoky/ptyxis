@@ -91,6 +91,17 @@ static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
+static void ptyxis_tab_commit_cb (PtyxisTab *, const char *, guint, PtyxisTerminal *);
+static void ptyxis_tab_notify_palette_cb (PtyxisTab *, GParamSpec *, PtyxisTerminal *);
+static void ptyxis_tab_notify_window_title_cb (PtyxisTab *, GParamSpec *, PtyxisTerminal *);
+static void ptyxis_tab_notify_window_subtitle_cb (PtyxisTab *, PtyxisTerminal *);
+static void ptyxis_tab_decrease_font_size_cb (PtyxisTab *, PtyxisTerminal *);
+static void ptyxis_tab_increase_font_size_cb (PtyxisTab *, PtyxisTerminal *);
+static void ptyxis_tab_bell_cb (PtyxisTab *, PtyxisTerminal *);
+static void ptyxis_tab_invalidate_icon (PtyxisTab *);
+static void ptyxis_tab_invalidate_progress (PtyxisTab *);
+static gboolean ptyxis_tab_match_clicked_cb (PtyxisTab *, double, double, int,
+                                             GdkModifierType, const char *, PtyxisTerminal *);
 
 static void
 ptyxis_tab_focus_relative_action (GtkWidget  *widget,
@@ -124,6 +135,47 @@ ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
   g_assert (PTYXIS_IS_PANE (pane));
 
   ptyxis_tab_set_active_pane (self, pane);
+}
+
+static void
+ptyxis_tab_connect_pane (PtyxisTab  *self,
+                         PtyxisPane *pane)
+{
+  PtyxisTerminal *terminal;
+
+  g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
+
+  terminal = ptyxis_pane_get_terminal (pane);
+  g_signal_connect_object (pane, "focus-entered",
+                           G_CALLBACK (ptyxis_tab_pane_focus_entered_cb),
+                           self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "commit",
+                           G_CALLBACK (ptyxis_tab_commit_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "notify::palette",
+                           G_CALLBACK (ptyxis_tab_notify_palette_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "notify::window-title",
+                           G_CALLBACK (ptyxis_tab_notify_window_title_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "current-file-uri-changed",
+                           G_CALLBACK (ptyxis_tab_notify_window_subtitle_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "current-directory-uri-changed",
+                           G_CALLBACK (ptyxis_tab_notify_window_subtitle_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "decrease-font-size",
+                           G_CALLBACK (ptyxis_tab_decrease_font_size_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "increase-font-size",
+                           G_CALLBACK (ptyxis_tab_increase_font_size_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "bell",
+                           G_CALLBACK (ptyxis_tab_bell_cb), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "termprop-changed::vte.container.name",
+                           G_CALLBACK (ptyxis_tab_invalidate_icon), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "termprop-changed::vte.container.runtime",
+                           G_CALLBACK (ptyxis_tab_invalidate_icon), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "termprop-changed::vte.progress.hint",
+                           G_CALLBACK (ptyxis_tab_invalidate_progress), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "termprop-changed::vte.progress.value",
+                           G_CALLBACK (ptyxis_tab_invalidate_progress), self, G_CONNECT_SWAPPED);
+  g_signal_connect_object (terminal, "match-clicked",
+                           G_CALLBACK (ptyxis_tab_match_clicked_cb), self, G_CONNECT_SWAPPED);
 }
 
 G_DEFINE_FINAL_TYPE (PtyxisTab, ptyxis_tab, GTK_TYPE_WIDGET)
@@ -1519,38 +1571,7 @@ ptyxis_tab_init (PtyxisTab *self)
   self->scrolled_window = ptyxis_pane_get_scrolled_window (self->pane);
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
   self->active_pane = self->pane;
-  g_signal_connect_object (self->pane,
-                           "focus-entered",
-                           G_CALLBACK (ptyxis_tab_pane_focus_entered_cb),
-                           self,
-                           G_CONNECT_SWAPPED);
-
-  g_signal_connect_object (self->terminal, "commit",
-                           G_CALLBACK (ptyxis_tab_commit_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "notify::palette",
-                           G_CALLBACK (ptyxis_tab_notify_palette_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "notify::window-title",
-                           G_CALLBACK (ptyxis_tab_notify_window_title_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "current-file-uri-changed",
-                           G_CALLBACK (ptyxis_tab_notify_window_subtitle_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "current-directory-uri-changed",
-                           G_CALLBACK (ptyxis_tab_notify_window_subtitle_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "decrease-font-size",
-                           G_CALLBACK (ptyxis_tab_decrease_font_size_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "increase-font-size",
-                           G_CALLBACK (ptyxis_tab_increase_font_size_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "bell",
-                           G_CALLBACK (ptyxis_tab_bell_cb), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "termprop-changed::vte.container.name",
-                           G_CALLBACK (ptyxis_tab_invalidate_icon), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "termprop-changed::vte.container.runtime",
-                           G_CALLBACK (ptyxis_tab_invalidate_icon), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "termprop-changed::vte.progress.hint",
-                           G_CALLBACK (ptyxis_tab_invalidate_progress), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "termprop-changed::vte.progress.value",
-                           G_CALLBACK (ptyxis_tab_invalidate_progress), self, G_CONNECT_SWAPPED);
-  g_signal_connect_object (self->terminal, "match-clicked",
-                           G_CALLBACK (ptyxis_tab_match_clicked_cb), self, G_CONNECT_SWAPPED);
+  ptyxis_tab_connect_pane (self, self->pane);
 
   ptyxis_tab_notify_init (&self->notify, self);
 
