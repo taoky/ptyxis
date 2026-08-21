@@ -1107,13 +1107,11 @@ ptyxis_tab_close_pane_action (GtkWidget  *widget,
   settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
   if (ptyxis_tab_is_running (self, NULL) && ptyxis_settings_get_prompt_on_close (settings))
     {
-      g_autoptr(GPtrArray) tabs = g_ptr_array_new_with_free_func (g_object_unref);
       GtkWindow *window = GTK_WINDOW (gtk_widget_get_root (widget));
 
-      g_ptr_array_add (tabs, g_object_ref (self));
-      _ptyxis_close_dialog_run_async (window, tabs, NULL,
-                                      ptyxis_tab_close_pane_dialog_cb,
-                                      ptyxis_tab_pane_call_new (self, self->active_pane));
+      _ptyxis_close_dialog_run_for_pane_async (window, self, self->active_pane, NULL,
+                                               ptyxis_tab_close_pane_dialog_cb,
+                                               ptyxis_tab_pane_call_new (self, self->active_pane));
       return;
     }
 

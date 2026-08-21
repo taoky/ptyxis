@@ -30,6 +30,7 @@
 typedef struct
 {
   PtyxisTab       *tab;
+  PtyxisPane      *pane;
   AdwAlertDialog *dialog;
 } SaveRequest;
 
@@ -39,6 +40,7 @@ save_request_clear (gpointer data)
   SaveRequest *sr = data;
 
   g_clear_object (&sr->tab);
+  g_clear_object (&sr->pane);
   g_clear_object (&sr->dialog);
 }
 
@@ -57,7 +59,10 @@ ptyxis_close_dialog_confirm (AdwAlertDialog *dialog,
     {
       const SaveRequest *sr = &g_array_index (requests, SaveRequest , i);
 
-      ptyxis_tab_force_quit (sr->tab);
+      if (sr->pane != NULL)
+        ptyxis_pane_force_quit (sr->pane);
+      else
+        ptyxis_tab_force_quit (sr->tab);
     }
 }
 
@@ -87,7 +92,8 @@ ptyxis_close_dialog_response (AdwAlertDialog *dialog,
 
 static AdwDialog *
 _ptyxis_close_dialog_new (GtkWindow *parent,
-                          GPtrArray *tabs)
+                          GPtrArray *tabs,
+                          PtyxisPane *pane)
 {
   g_autoptr(GArray) requests = NULL;
   const char *discard_label;
@@ -157,6 +163,7 @@ _ptyxis_close_dialog_new (GtkWindow *parent,
       adw_preferences_group_add (ADW_PREFERENCES_GROUP (group), row);
 
       sr.tab = g_object_ref (tab);
+      sr.pane = pane != NULL ? g_object_ref (pane) : NULL;
       sr.dialog = g_object_ref (ADW_ALERT_DIALOG (dialog));
 
       g_array_append_val (requests, sr);
@@ -187,7 +194,7 @@ _ptyxis_close_dialog_run_async (GtkWindow           *parent,
   g_return_if_fail (!parent || GTK_IS_WINDOW (parent));
   g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
 
-  dialog = _ptyxis_close_dialog_new (parent, tabs);
+  dialog = _ptyxis_close_dialog_new (parent, tabs, NULL);
   task = g_task_new (dialog, cancellable, callback, user_data);
   g_task_set_source_tag (task, _ptyxis_close_dialog_run_async);
 
@@ -197,6 +204,35 @@ _ptyxis_close_dialog_run_async (GtkWindow           *parent,
       return;
     }
 
+  g_object_set_data_full (G_OBJECT (dialog),
+                          "G_TASK",
+                          g_steal_pointer (&task),
+                          g_object_unref);
+  adw_dialog_present (dialog, GTK_WIDGET (parent));
+}
+
+void
+_ptyxis_close_dialog_run_for_pane_async (GtkWindow           *parent,
+                                         PtyxisTab           *tab,
+                                         PtyxisPane          *pane,
+                                         GCancellable        *cancellable,
+                                         GAsyncReadyCallback  callback,
+                                         gpointer             user_data)
+{
+  g_autoptr(GPtrArray) tabs = NULL;
+  g_autoptr(GTask) task = NULL;
+  AdwDialog *dialog;
+
+  g_return_if_fail (GTK_IS_WINDOW (parent));
+  g_return_if_fail (PTYXIS_IS_TAB (tab));
+  g_return_if_fail (PTYXIS_IS_PANE (pane));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  tabs = g_ptr_array_new_with_free_func (g_object_unref);
+  g_ptr_array_add (tabs, g_object_ref (tab));
+  dialog = _ptyxis_close_dialog_new (parent, tabs, pane);
+  task = g_task_new (dialog, cancellable, callback, user_data);
+  g_task_set_source_tag (task, _ptyxis_close_dialog_run_for_pane_async);
   g_object_set_data_full (G_OBJECT (dialog),
                           "G_TASK",
                           g_steal_pointer (&task),
