@@ -2620,3 +2620,10 @@ ptyxis_window_is_animating (PtyxisWindow *self)
 
   return self->tab_overview_animating;
 }
+
+gboolean
+ptyxis_window_get_single_terminal_mode (PtyxisWindow *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_WINDOW (self), FALSE);
+  return self->single_terminal_mode;
+}

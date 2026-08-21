@@ -32,6 +32,7 @@ struct _PtyxisTabMonitor
 {
   GObject   parent_instance;
   GWeakRef  tab_wr;
+  GWeakRef  terminal_wr;
   GSource  *update_source;
   int       current_delay_msec;
   guint     has_pressed_key : 1;
@@ -122,11 +123,14 @@ ptyxis_tab_monitor_update_source_func (gpointer user_data)
 {
   PtyxisTabMonitor *self = user_data;
   g_autoptr(PtyxisTab) tab = NULL;
+  g_autoptr(PtyxisTerminal) terminal = NULL;
   PtyxisIpcProcess *process;
 
   g_assert (PTYXIS_IS_TAB_MONITOR (self));
 
   if ((tab = g_weak_ref_get (&self->tab_wr)) &&
+      (terminal = g_weak_ref_get (&self->terminal_wr)) &&
+      ptyxis_tab_get_terminal (tab) == terminal &&
       (process = ptyxis_tab_get_process (tab)))
     {
       ptyxis_tab_monitor_same_delay (self);
@@ -255,6 +259,7 @@ ptyxis_tab_monitor_set_tab (PtyxisTabMonitor *self,
   g_weak_ref_set (&self->tab_wr, tab);
 
   terminal = ptyxis_tab_get_terminal (tab);
+  g_weak_ref_set (&self->terminal_wr, terminal);
 
   g_signal_connect_object (terminal,
                            "contents-changed",
@@ -274,7 +279,7 @@ ptyxis_tab_monitor_set_tab (PtyxisTabMonitor *self,
                            self,
                            G_CONNECT_SWAPPED);
   gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);
-  gtk_widget_add_controller (GTK_WIDGET (tab), controller);
+  gtk_widget_add_controller (GTK_WIDGET (terminal), controller);
 }
 
 static void
@@ -289,6 +294,7 @@ ptyxis_tab_monitor_finalize (GObject *object)
     }
 
   g_weak_ref_clear (&self->tab_wr);
+  g_weak_ref_clear (&self->terminal_wr);
 
   G_OBJECT_CLASS (ptyxis_tab_monitor_parent_class)->finalize (object);
 }
@@ -356,6 +362,7 @@ ptyxis_tab_monitor_init (PtyxisTabMonitor *self)
   self->current_delay_msec = DELAY_MIN_MSEC;
 
   g_weak_ref_init (&self->tab_wr, NULL);
+  g_weak_ref_init (&self->terminal_wr, NULL);
 }
 
 PtyxisTabMonitor *

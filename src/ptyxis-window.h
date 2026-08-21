@@ -56,6 +56,7 @@ void           ptyxis_window_visual_bell         (PtyxisWindow       *self);
 gboolean       ptyxis_window_focus_tab_by_uuid   (PtyxisWindow       *self,
                                                   const char         *uuid);
 gboolean       ptyxis_window_is_animating        (PtyxisWindow       *self);
+gboolean       ptyxis_window_get_single_terminal_mode (PtyxisWindow   *self);
 void           ptyxis_window_set_tab_pinned      (PtyxisWindow       *self,
                                                   PtyxisTab          *tab,
                                                   gboolean            pinned);

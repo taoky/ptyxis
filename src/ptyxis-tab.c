@@ -89,6 +89,7 @@ enum {
 
 static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
+static void ptyxis_tab_apply_zoom (PtyxisTab *self);
 static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
@@ -358,7 +359,7 @@ ptyxis_tab_update_scrollback_lines (PtyxisTab *self)
   if (ptyxis_profile_get_limit_scrollback (ptyxis_tab_get_profile (self)))
     scrollback_lines = ptyxis_profile_get_scrollback_lines (ptyxis_tab_get_profile (self));
 
-  vte_terminal_set_scrollback_lines (VTE_TERMINAL (self->terminal), scrollback_lines);
+  vte_terminal_set_scrollback_lines (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), scrollback_lines);
 }
 
 static void
@@ -371,7 +372,7 @@ ptyxis_tab_update_cell_height_scale (PtyxisTab *self)
   if (ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self)))
     cell_height_scale = ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self));
 
-  vte_terminal_set_cell_height_scale (VTE_TERMINAL (self->terminal), cell_height_scale);
+  vte_terminal_set_cell_height_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), cell_height_scale);
 }
 
 static void
@@ -384,7 +385,7 @@ ptyxis_tab_update_cell_width_scale (PtyxisTab *self)
   if (ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self)))
     cell_width_scale = ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self));
 
-  vte_terminal_set_cell_width_scale (VTE_TERMINAL (self->terminal), cell_width_scale);
+  vte_terminal_set_cell_width_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), cell_width_scale);
 }
 
 static void
@@ -395,7 +396,7 @@ ptyxis_tab_update_custom_links (PtyxisTab *self)
   g_assert (PTYXIS_IS_TAB (self));
 
   custom_links_list = ptyxis_profile_list_custom_links(ptyxis_tab_get_profile (self));
-  ptyxis_terminal_update_custom_links_list(self->terminal, custom_links_list);
+  ptyxis_terminal_update_custom_links_list(ptyxis_pane_get_terminal (self->active_pane), custom_links_list);
 }
 
 static void
@@ -743,6 +744,74 @@ ptyxis_tab_respawn_action (GtkWidget  *widget,
   if (ptyxis_pane_get_state (self->active_pane) == PTYXIS_PANE_STATE_FAILED ||
       ptyxis_pane_get_state (self->active_pane) == PTYXIS_PANE_STATE_EXITED)
     ptyxis_tab_respawn (self);
+}
+
+static void
+ptyxis_tab_split_action (GtkWidget  *widget,
+                         const char *action_name,
+                         GVariant   *params)
+{
+  PtyxisTab *self = PTYXIS_TAB (widget);
+  g_autoptr(PtyxisPane) new_pane = NULL;
+  PtyxisSplitNode *leaf;
+  PtyxisSplitDirection direction;
+  GtkWidget *old_parent;
+  GtkWidget *paned;
+  gboolean was_start = FALSE;
+
+  if (PTYXIS_IS_WINDOW (gtk_widget_get_root (widget)) &&
+      ptyxis_window_get_single_terminal_mode (PTYXIS_WINDOW (gtk_widget_get_root (widget))))
+    return;
+
+  direction = g_str_equal (action_name, "tab.split-horizontal")
+            ? PTYXIS_SPLIT_HORIZONTAL
+            : PTYXIS_SPLIT_VERTICAL;
+  leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (self->active_pane));
+  g_return_if_fail (leaf != NULL);
+
+  new_pane = ptyxis_pane_new_for_split (self->active_pane);
+  g_object_ref_sink (new_pane);
+  ptyxis_tab_connect_pane (self, new_pane);
+
+  old_parent = gtk_widget_get_parent (GTK_WIDGET (self->active_pane));
+  g_object_ref (self->active_pane);
+  if (GTK_IS_PANED (old_parent))
+    {
+      was_start = gtk_paned_get_start_child (GTK_PANED (old_parent)) == GTK_WIDGET (self->active_pane);
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (old_parent), NULL);
+      else
+        gtk_paned_set_end_child (GTK_PANED (old_parent), NULL);
+    }
+  else
+    gtk_widget_unparent (GTK_WIDGET (self->active_pane));
+
+  paned = gtk_paned_new (direction == PTYXIS_SPLIT_HORIZONTAL
+                         ? GTK_ORIENTATION_HORIZONTAL
+                         : GTK_ORIENTATION_VERTICAL);
+  gtk_paned_set_start_child (GTK_PANED (paned), GTK_WIDGET (self->active_pane));
+  gtk_paned_set_end_child (GTK_PANED (paned), GTK_WIDGET (new_pane));
+
+  if (GTK_IS_PANED (old_parent))
+    {
+      if (was_start)
+        gtk_paned_set_start_child (GTK_PANED (old_parent), paned);
+      else
+        gtk_paned_set_end_child (GTK_PANED (old_parent), paned);
+    }
+  else
+    gtk_widget_set_parent (paned, GTK_WIDGET (self));
+  g_object_unref (self->active_pane);
+
+  ptyxis_split_node_split (leaf, direction, .5, G_OBJECT (new_pane));
+  ptyxis_tab_set_active_pane (self, new_pane);
+  ptyxis_tab_update_scrollback_lines (self);
+  ptyxis_tab_update_cell_height_scale (self);
+  ptyxis_tab_update_cell_width_scale (self);
+  ptyxis_tab_update_custom_links (self);
+  ptyxis_tab_apply_zoom (self);
+  ptyxis_tab_respawn_pane (self, new_pane);
+  gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (new_pane)));
 }
 
 
@@ -1607,6 +1676,10 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
                                    ptyxis_tab_focus_relative_action);
   gtk_widget_class_install_action (widget_class, "tab.focus-pane-previous", NULL,
                                    ptyxis_tab_focus_relative_action);
+  gtk_widget_class_install_action (widget_class, "tab.split-horizontal", NULL,
+                                   ptyxis_tab_split_action);
+  gtk_widget_class_install_action (widget_class, "tab.split-vertical", NULL,
+                                   ptyxis_tab_split_action);
 
   g_type_ensure (PTYXIS_TYPE_TERMINAL);
   g_type_ensure (PTYXIS_TYPE_PANE);
