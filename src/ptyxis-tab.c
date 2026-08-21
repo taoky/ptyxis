@@ -1136,7 +1136,7 @@ ptyxis_tab_notify_contains_focus_cb (PtyxisTab               *self,
     {
       ptyxis_tab_set_needs_attention (self, FALSE);
       g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                           ptyxis_pane_get_uuid (self->pane));
+                                           ptyxis_pane_get_uuid (self->active_pane));
     }
 }
 
@@ -1209,7 +1209,7 @@ ptyxis_tab_dup_icon (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  kind = ptyxis_pane_get_process_leader_kind (self->pane);
+  kind = ptyxis_pane_get_process_leader_kind (self->active_pane);
 
   switch (kind)
     {
@@ -1228,7 +1228,7 @@ ptyxis_tab_dup_icon (PtyxisTab *self)
 
         if (!(container = ptyxis_tab_discover_container (self)))
           {
-            if (!(container = ptyxis_pane_dup_container (self->pane)))
+            if (!(container = ptyxis_pane_dup_container (self->active_pane)))
               {
                 if (ptyxis_tab_get_profile (self) != NULL)
                 {
@@ -1661,7 +1661,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_COMMAND_LINE:
-      g_value_set_string (value, ptyxis_pane_get_command_line (self->pane));
+      g_value_set_string (value, ptyxis_pane_get_command_line (self->active_pane));
       break;
 
     case PROP_ICON:
@@ -1677,7 +1677,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_PROCESS_LEADER_KIND:
-      g_value_set_enum (value, ptyxis_pane_get_process_leader_kind (self->pane));
+      g_value_set_enum (value, ptyxis_pane_get_process_leader_kind (self->active_pane));
       break;
 
     case PROP_PROGRESS:
@@ -1693,7 +1693,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_READ_ONLY:
-      g_value_set_boolean (value, ptyxis_pane_get_read_only (self->pane));
+      g_value_set_boolean (value, ptyxis_pane_get_read_only (self->active_pane));
       break;
 
     case PROP_SUBTITLE:
@@ -1740,11 +1740,11 @@ ptyxis_tab_set_property (GObject      *object,
       break;
 
     case PROP_PROFILE:
-      ptyxis_pane_set_profile (self->pane, g_value_get_object (value));
+      ptyxis_pane_set_profile (self->active_pane, g_value_get_object (value));
       break;
 
     case PROP_READ_ONLY:
-      ptyxis_pane_set_read_only (self->pane, g_value_get_boolean (value));
+      ptyxis_pane_set_read_only (self->active_pane, g_value_get_boolean (value));
       break;
 
     case PROP_TITLE_PREFIX:
@@ -2018,9 +2018,17 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
 
   if (self->active_pane != pane)
     {
+      PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+
       g_object_freeze_notify (G_OBJECT (self));
       self->active_pane = pane;
-      ptyxis_tab_notify_set_terminal (&self->notify, ptyxis_pane_get_terminal (pane));
+      self->banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
+      self->terminal = ptyxis_pane_get_terminal (pane);
+      self->scrolled_window = ptyxis_pane_get_scrolled_window (pane);
+      ptyxis_tab_notify_set_terminal (&self->notify, self->terminal);
+      ptyxis_tab_update_scrollbar_policy (self);
+      ptyxis_tab_update_padding_cb (self, NULL, settings);
+      ptyxis_tab_update_word_char_exceptions (self, NULL, settings);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ACTIVE_PANE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
@@ -2462,7 +2470,7 @@ ptyxis_tab_set_initial_working_directory_uri (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  ptyxis_pane_set_initial_working_directory_uri (self->pane, initial_working_directory_uri);
+  ptyxis_pane_set_initial_working_directory_uri (self->active_pane, initial_working_directory_uri);
 }
 
 char *
@@ -2470,7 +2478,7 @@ ptyxis_tab_dup_previous_working_directory_uri (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return g_strdup (ptyxis_pane_get_previous_working_directory_uri (self->pane));
+  return g_strdup (ptyxis_pane_get_previous_working_directory_uri (self->active_pane));
 }
 
 
@@ -2480,7 +2488,7 @@ ptyxis_tab_set_previous_working_directory_uri (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  ptyxis_pane_set_previous_working_directory_uri (self->pane, previous_working_directory_uri);
+  ptyxis_pane_set_previous_working_directory_uri (self->active_pane, previous_working_directory_uri);
 }
 
 static void
@@ -2619,10 +2627,10 @@ ptyxis_tab_is_running (PtyxisTab  *self,
   ptyxis_tab_poll_agent (self);
 
   if (cmdline != NULL)
-    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->pane));
+    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->active_pane));
 
-  if (ptyxis_pane_get_has_foreground_process (self->pane) && ptyxis_pane_get_program_name (self->pane) != NULL)
-    return !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane));
+  if (ptyxis_pane_get_has_foreground_process (self->active_pane) && ptyxis_pane_get_program_name (self->active_pane) != NULL)
+    return !ptyxis_is_shell (ptyxis_pane_get_program_name (self->active_pane));
 
   return FALSE;
 }
@@ -2690,7 +2698,7 @@ ptyxis_tab_get_uuid (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_uuid (self->pane);
+  return ptyxis_pane_get_uuid (self->active_pane);
 }
 
 PtyxisIpcContainer *
@@ -2707,7 +2715,7 @@ ptyxis_tab_dup_container (PtyxisTab *self)
     container = ptyxis_application_find_container_by_name (PTYXIS_APPLICATION_DEFAULT, runtime, name);
 
   if (container == NULL)
-    container = ptyxis_pane_dup_container (self->pane);
+    container = ptyxis_pane_dup_container (self->active_pane);
 
   return g_steal_pointer (&container);
 }
@@ -2719,7 +2727,7 @@ ptyxis_tab_set_container (PtyxisTab          *self,
   g_return_if_fail (PTYXIS_IS_TAB (self));
   g_return_if_fail (!container || PTYXIS_IPC_IS_CONTAINER (container));
 
-  ptyxis_pane_set_container (self->pane, container);
+  ptyxis_pane_set_container (self->active_pane, container);
 }
 
 static void
@@ -2735,6 +2743,7 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
   gboolean has_foreground_process;
   gboolean changed = FALSE;
   gboolean inhibit_changed = FALSE;
+  PtyxisPane *pane;
   PtyxisTab *self;
   GPid the_pid;
 
@@ -2743,8 +2752,10 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
   g_assert (G_IS_TASK (task));
 
   self = g_task_get_source_object (task);
+  pane = g_task_get_task_data (task);
 
   g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
 
   ptyxis_ipc_process_call_has_foreground_process_finish (process,
                                                          &has_foreground_process,
@@ -2755,17 +2766,17 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
                                                          result,
                                                          NULL);
 
-  if (ptyxis_pane_get_foreground_pid (self->pane) != the_pid)
+  if (ptyxis_pane_get_foreground_pid (pane) != the_pid)
     {
       changed = TRUE;
-      ptyxis_pane_set_foreground_pid (self->pane, the_pid);
+      ptyxis_pane_set_foreground_pid (pane, the_pid);
     }
 
-  if (ptyxis_pane_get_has_foreground_process (self->pane) != has_foreground_process)
+  if (ptyxis_pane_get_has_foreground_process (pane) != has_foreground_process)
     {
       changed = TRUE;
       inhibit_changed = TRUE;
-      ptyxis_pane_set_has_foreground_process (self->pane, has_foreground_process);
+      ptyxis_pane_set_has_foreground_process (pane, has_foreground_process);
     }
 
   if (g_strcmp0 (the_leader_kind, "superuser") == 0)
@@ -2777,10 +2788,10 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
   else
     leader_kind = PTYXIS_PROCESS_LEADER_KIND_UNKNOWN;
 
-  if (ptyxis_pane_get_process_leader_kind (self->pane) != leader_kind)
+  if (ptyxis_pane_get_process_leader_kind (pane) != leader_kind)
     {
       changed = TRUE;
-      ptyxis_pane_set_process_leader_kind (self->pane, leader_kind);
+      ptyxis_pane_set_process_leader_kind (pane, leader_kind);
 
       if (!ptyxis_tab_is_active (self))
         ptyxis_tab_set_needs_attention (self, TRUE);
@@ -2788,20 +2799,20 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
     }
 
-  if (g_strcmp0 (ptyxis_pane_get_command_line (self->pane), the_cmdline) != 0)
+  if (g_strcmp0 (ptyxis_pane_get_command_line (pane), the_cmdline) != 0)
     {
       g_autofree char *program_name = NULL;
       const char *space;
 
       changed = TRUE;
-      ptyxis_pane_set_command_line (self->pane, the_cmdline);
+      ptyxis_pane_set_command_line (pane, the_cmdline);
 
       if (the_cmdline != NULL && (space = strchr (the_cmdline, ' ')))
         program_name = g_strndup (the_cmdline, space - the_cmdline);
 
-      if (g_strcmp0 (ptyxis_pane_get_program_name (self->pane), program_name) != 0)
+      if (g_strcmp0 (ptyxis_pane_get_program_name (pane), program_name) != 0)
         {
-          ptyxis_pane_set_program_name (self->pane, program_name);
+          ptyxis_pane_set_program_name (pane, program_name);
           inhibit_changed = TRUE;
         }
 
@@ -2825,6 +2836,9 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
 {
   g_autoptr(GUnixFDList) fd_list = NULL;
   g_autoptr(GTask) task = NULL;
+  PtyxisIpcProcess *process;
+  PtyxisPane *pane;
+  PtyxisTerminal *terminal;
   VtePty *pty;
   int handle;
   int pty_fd;
@@ -2833,21 +2847,25 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
 
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_source_tag (task, ptyxis_tab_poll_agent_async);
+  pane = self->active_pane;
+  terminal = ptyxis_pane_get_terminal (pane);
+  process = ptyxis_pane_get_process (pane);
+  g_task_set_task_data (task, g_object_ref (pane), g_object_unref);
 
-  if (ptyxis_tab_get_process (self) == NULL)
+  if (process == NULL)
     {
-      ptyxis_pane_set_has_foreground_process (self->pane, FALSE);
-      ptyxis_pane_set_foreground_pid (self->pane, -1);
+      ptyxis_pane_set_has_foreground_process (pane, FALSE);
+      ptyxis_pane_set_foreground_pid (pane, -1);
 
-      if (ptyxis_pane_get_command_line (self->pane) != NULL)
+      if (ptyxis_pane_get_command_line (pane) != NULL)
         {
-          ptyxis_pane_set_command_line (self->pane, NULL);
+          ptyxis_pane_set_command_line (pane, NULL);
           g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
         }
 
-      if (ptyxis_pane_get_process_leader_kind (self->pane) != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
+      if (ptyxis_pane_get_process_leader_kind (pane) != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
         {
-          ptyxis_pane_set_process_leader_kind (self->pane, PTYXIS_PROCESS_LEADER_KIND_UNKNOWN);
+          ptyxis_pane_set_process_leader_kind (pane, PTYXIS_PROCESS_LEADER_KIND_UNKNOWN);
           g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
         }
 
@@ -2856,12 +2874,12 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
       return;
     }
 
-  pty = vte_terminal_get_pty (VTE_TERMINAL (self->terminal));
+  pty = vte_terminal_get_pty (VTE_TERMINAL (terminal));
   pty_fd = vte_pty_get_fd (pty);
   fd_list = g_unix_fd_list_new ();
   handle = g_unix_fd_list_append (fd_list, pty_fd, NULL);
 
-  ptyxis_ipc_process_call_has_foreground_process (ptyxis_tab_get_process (self),
+  ptyxis_ipc_process_call_has_foreground_process (process,
                                                   g_variant_new_handle (handle),
                                                   fd_list,
                                                   cancellable,
@@ -2892,12 +2910,12 @@ ptyxis_tab_has_foreground_process (PtyxisTab  *self,
   ptyxis_tab_poll_agent (self);
 
   if (pid != NULL)
-    *pid = ptyxis_pane_get_foreground_pid (self->pane);
+    *pid = ptyxis_pane_get_foreground_pid (self->active_pane);
 
   if (cmdline != NULL)
-    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->pane));
+    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->active_pane));
 
-  return ptyxis_pane_get_has_foreground_process (self->pane);
+  return ptyxis_pane_get_has_foreground_process (self->active_pane);
 }
 
 void
@@ -2909,7 +2927,7 @@ ptyxis_tab_set_command (PtyxisTab          *self,
   if (command != NULL && command[0] == NULL)
     command = NULL;
 
-  ptyxis_pane_set_command (self->pane, command);
+  ptyxis_pane_set_command (self->active_pane, command);
 }
 
 const char *
@@ -2917,7 +2935,7 @@ ptyxis_tab_get_initial_title (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_initial_title (self->pane);
+  return ptyxis_pane_get_initial_title (self->active_pane);
 }
 
 void
@@ -2926,7 +2944,7 @@ ptyxis_tab_set_initial_title (PtyxisTab  *self,
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  ptyxis_pane_set_initial_title (self->pane, initial_title);
+  ptyxis_pane_set_initial_title (self->active_pane, initial_title);
 }
 
 const char *
@@ -2934,7 +2952,7 @@ ptyxis_tab_get_command_line (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_pane_get_command_line (self->pane);
+  return ptyxis_pane_get_command_line (self->active_pane);
 }
 
 #ifdef __linux__
@@ -3250,7 +3268,7 @@ ptyxis_tab_get_ignore_osc_title (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), FALSE);
 
-  return ptyxis_pane_get_ignore_osc_title (self->pane);
+  return ptyxis_pane_get_ignore_osc_title (self->active_pane);
 }
 
 void
@@ -3261,9 +3279,9 @@ ptyxis_tab_set_ignore_osc_title (PtyxisTab *self,
 
   ignore_osc_title = !!ignore_osc_title;
 
-  if (ignore_osc_title != ptyxis_pane_get_ignore_osc_title (self->pane))
+  if (ignore_osc_title != ptyxis_pane_get_ignore_osc_title (self->active_pane))
     {
-      ptyxis_pane_set_ignore_osc_title (self->pane, ignore_osc_title);
+      ptyxis_pane_set_ignore_osc_title (self->active_pane, ignore_osc_title);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
     }
