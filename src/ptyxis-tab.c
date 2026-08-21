@@ -876,12 +876,14 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
           ? gtk_paned_get_end_child (paned)
           : gtk_paned_get_start_child (paned);
 
-  /* Move focus out of the pane before detaching it. GtkPaned tracks its
-   * last focused descendant and warns if that widget disappears while it
-   * is still the focus child.
+  /* Move focus outside the GtkPaned before detaching either child. The pane
+   * which will survive is still a descendant of this GtkPaned until the
+   * collapse is complete, so focusing it here would not clear GtkPaned's
+   * last-focus tracking.
    */
   ptyxis_tab_set_active_pane (self, PTYXIS_PANE (ptyxis_split_node_get_pane (next)));
-  gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (self->active_pane)));
+  gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
+  gtk_widget_grab_focus (GTK_WIDGET (self));
 
   g_object_ref (sibling);
   gtk_paned_set_start_child (paned, NULL);
@@ -905,6 +907,9 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
       gtk_widget_set_parent (sibling, GTK_WIDGET (self));
     }
   g_object_unref (sibling);
+
+  gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (self->active_pane)));
+  gtk_widget_set_focusable (GTK_WIDGET (self), FALSE);
 
   ptyxis_pane_force_quit (pane);
   ptyxis_split_node_remove (leaf);
