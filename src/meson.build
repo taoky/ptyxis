@@ -44,6 +44,7 @@ ptyxis_sources = [
 ]
 
 ptyxis_enum_headers = [
+  'ptyxis-pane.h',
   'ptyxis-profile.h',
   'ptyxis-settings.h',
   'ptyxis-tab.h',

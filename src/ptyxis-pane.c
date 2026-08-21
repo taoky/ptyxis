@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "config.h"
+#include "ptyxis-enums.h"
 #include "ptyxis-pane.h"
 
 struct _PtyxisPane
@@ -9,11 +10,13 @@ struct _PtyxisPane
   GtkWidget parent_instance;
   PtyxisProfile *profile;
   PtyxisTerminal *terminal;
+  PtyxisZoomLevel zoom;
 };
 
 enum {
   PROP_0,
   PROP_PROFILE,
+  PROP_ZOOM,
   N_PROPS
 };
 
@@ -49,6 +52,10 @@ ptyxis_pane_get_property (GObject    *object,
       g_value_set_object (value, self->profile);
       break;
 
+    case PROP_ZOOM:
+      g_value_set_enum (value, self->zoom);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -66,6 +73,10 @@ ptyxis_pane_set_property (GObject      *object,
     {
     case PROP_PROFILE:
       ptyxis_pane_set_profile (self, g_value_get_object (value));
+      break;
+
+    case PROP_ZOOM:
+      ptyxis_pane_set_zoom (self, g_value_get_enum (value));
       break;
 
     default:
@@ -89,6 +100,13 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
                          (G_PARAM_READWRITE |
                           G_PARAM_EXPLICIT_NOTIFY |
                           G_PARAM_STATIC_STRINGS));
+  properties[PROP_ZOOM] =
+    g_param_spec_enum ("zoom", NULL, NULL,
+                       PTYXIS_TYPE_ZOOM_LEVEL,
+                       PTYXIS_ZOOM_LEVEL_DEFAULT,
+                       (G_PARAM_READWRITE |
+                        G_PARAM_EXPLICIT_NOTIFY |
+                        G_PARAM_STATIC_STRINGS));
   g_object_class_install_properties (object_class, N_PROPS, properties);
   gtk_widget_class_set_layout_manager_type (widget_class, GTK_TYPE_BIN_LAYOUT);
   gtk_widget_class_set_css_name (widget_class, "ptyxis-pane");
@@ -97,6 +115,29 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
 static void
 ptyxis_pane_init (PtyxisPane *self)
 {
+  self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
+}
+
+PtyxisZoomLevel
+ptyxis_pane_get_zoom (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), PTYXIS_ZOOM_LEVEL_DEFAULT);
+  return self->zoom;
+}
+
+void
+ptyxis_pane_set_zoom (PtyxisPane      *self,
+                      PtyxisZoomLevel  zoom)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (zoom >= PTYXIS_ZOOM_LEVEL_MINUS_14 &&
+                    zoom <= PTYXIS_ZOOM_LEVEL_PLUS_14);
+
+  if (self->zoom != zoom)
+    {
+      self->zoom = zoom;
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
+    }
 }
 
 PtyxisPane *

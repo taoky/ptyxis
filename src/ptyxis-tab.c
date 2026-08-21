@@ -79,7 +79,6 @@ struct _PtyxisTab
 
   gint64                   respawn_time;
 
-  PtyxisZoomLevel          zoom : 5;
   PtyxisProcessLeaderKind  leader_kind : 3;
   guint                    has_foreground_process : 1;
   guint                    forced_exit : 1;
@@ -1516,7 +1515,6 @@ ptyxis_tab_init (PtyxisTab *self)
   GtkEventController *controller;
 
   self->state = PTYXIS_TAB_STATE_INITIAL;
-  self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
 
   gtk_widget_init_template (GTK_WIDGET (self));
@@ -1755,7 +1753,7 @@ ptyxis_tab_apply_zoom (PtyxisTab *self)
   g_assert (PTYXIS_IS_TAB (self));
 
   vte_terminal_set_font_scale (VTE_TERMINAL (self->terminal),
-                               zoom_font_scales[self->zoom]);
+                               zoom_font_scales[ptyxis_pane_get_zoom (self->pane)]);
 }
 
 PtyxisZoomLevel
@@ -1763,7 +1761,7 @@ ptyxis_tab_get_zoom (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), 0);
 
-  return self->zoom;
+  return ptyxis_pane_get_zoom (self->pane);
 }
 
 void
@@ -1774,9 +1772,9 @@ ptyxis_tab_set_zoom (PtyxisTab       *self,
   g_return_if_fail (zoom >= PTYXIS_ZOOM_LEVEL_MINUS_14 &&
                     zoom <= PTYXIS_ZOOM_LEVEL_PLUS_14);
 
-  if (zoom != self->zoom)
+  if (zoom != ptyxis_pane_get_zoom (self->pane))
     {
-      self->zoom = zoom;
+      ptyxis_pane_set_zoom (self->pane, zoom);
       ptyxis_tab_apply_zoom (self);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM_LABEL]);
@@ -1788,8 +1786,8 @@ ptyxis_tab_zoom_in (PtyxisTab *self)
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  if (self->zoom < PTYXIS_ZOOM_LEVEL_PLUS_14)
-    ptyxis_tab_set_zoom (self, self->zoom + 1);
+  if (ptyxis_tab_get_zoom (self) < PTYXIS_ZOOM_LEVEL_PLUS_14)
+    ptyxis_tab_set_zoom (self, ptyxis_tab_get_zoom (self) + 1);
 }
 
 void
@@ -1797,8 +1795,8 @@ ptyxis_tab_zoom_out (PtyxisTab *self)
 {
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
-  if (self->zoom > PTYXIS_ZOOM_LEVEL_MINUS_14)
-    ptyxis_tab_set_zoom (self, self->zoom - 1);
+  if (ptyxis_tab_get_zoom (self) > PTYXIS_ZOOM_LEVEL_MINUS_14)
+    ptyxis_tab_set_zoom (self, ptyxis_tab_get_zoom (self) - 1);
 }
 
 PtyxisTerminal *
@@ -1946,10 +1944,10 @@ ptyxis_tab_dup_zoom_label (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), 0);
 
-  if (self->zoom == PTYXIS_ZOOM_LEVEL_DEFAULT)
+  if (ptyxis_tab_get_zoom (self) == PTYXIS_ZOOM_LEVEL_DEFAULT)
     return g_strdup ("100%");
 
-  return g_strdup_printf ("%.0lf%%", zoom_font_scales[self->zoom] * 100.0);
+  return g_strdup_printf ("%.0lf%%", zoom_font_scales[ptyxis_tab_get_zoom (self)] * 100.0);
 }
 
 void
