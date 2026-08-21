@@ -841,6 +841,28 @@ ptyxis_tab_respawn_action (GtkWidget  *widget,
 }
 
 static void
+ptyxis_tab_split_position_changed_cb (GtkPaned        *paned,
+                                      GParamSpec      *pspec,
+                                      PtyxisSplitNode *node)
+{
+  GtkOrientation orientation;
+  int extent;
+  int position;
+
+  g_assert (GTK_IS_PANED (paned));
+  g_assert (node != NULL);
+
+  orientation = gtk_orientable_get_orientation (GTK_ORIENTABLE (paned));
+  extent = orientation == GTK_ORIENTATION_HORIZONTAL
+         ? gtk_widget_get_width (GTK_WIDGET (paned))
+         : gtk_widget_get_height (GTK_WIDGET (paned));
+  position = gtk_paned_get_position (paned);
+
+  if (extent > 1)
+    ptyxis_split_node_set_ratio (node, (double)position / extent);
+}
+
+static void
 ptyxis_tab_split_action (GtkWidget  *widget,
                          const char *action_name,
                          GVariant   *params)
@@ -911,6 +933,10 @@ ptyxis_tab_split_action (GtkWidget  *widget,
   g_object_unref (self->active_pane);
 
   ptyxis_split_node_split (leaf, direction, .5, G_OBJECT (new_pane));
+  g_signal_connect (paned,
+                    "notify::position",
+                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
+                    leaf);
   ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_set_active_pane (self, new_pane);
   ptyxis_tab_update_scrollback_lines (self);
