@@ -10,6 +10,8 @@
 
 G_BEGIN_DECLS
 
+typedef struct _PtyxisTabMonitor PtyxisTabMonitor;
+
 typedef enum _PtyxisZoomLevel
 {
   PTYXIS_ZOOM_LEVEL_MINUS_14 = 1,
@@ -59,6 +61,9 @@ void            ptyxis_pane_set_zoom     (PtyxisPane     *self,
 PtyxisIpcProcess *ptyxis_pane_get_process (PtyxisPane     *self);
 void              ptyxis_pane_set_process (PtyxisPane     *self,
                                             PtyxisIpcProcess *process);
+PtyxisTabMonitor *ptyxis_pane_get_monitor (PtyxisPane      *self);
+void              ptyxis_pane_set_monitor (PtyxisPane      *self,
+                                            PtyxisTabMonitor *monitor);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 

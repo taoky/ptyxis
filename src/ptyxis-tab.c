@@ -58,7 +58,6 @@ struct _PtyxisTab
   char                    *initial_working_directory_uri;
   char                    *previous_working_directory_uri;
   char                    *title_prefix;
-  PtyxisTabMonitor        *monitor;
   char                    *uuid;
   PtyxisIpcContainer      *container_at_creation;
   char                   **command;
@@ -445,7 +444,7 @@ ptyxis_tab_wait_cb (GObject      *object,
    */
   if ((self->command == NULL || self->state == PTYXIS_TAB_STATE_FAILED) &&
       (g_get_monotonic_time () - self->respawn_time) < (G_USEC_PER_SEC/2) &&
-      !ptyxis_tab_monitor_get_has_pressed_key (self->monitor))
+      !ptyxis_tab_monitor_get_has_pressed_key (ptyxis_pane_get_monitor (self->pane)))
     exit_action = PTYXIS_EXIT_ACTION_NONE;
 
   switch (exit_action)
@@ -977,7 +976,11 @@ ptyxis_tab_constructed (GObject *object)
                            G_CONNECT_SWAPPED);
   ptyxis_tab_update_inhibit (self);
 
-  self->monitor = ptyxis_tab_monitor_new (self);
+  {
+    g_autoptr(PtyxisTabMonitor) monitor = ptyxis_tab_monitor_new (self);
+
+    ptyxis_pane_set_monitor (self->pane, monitor);
+  }
 }
 
 static void
@@ -1190,7 +1193,6 @@ ptyxis_tab_dispose (GObject *object)
 
   g_clear_object (&self->cached_texture);
   g_clear_object (&self->profile_signals);
-  g_clear_object (&self->monitor);
   g_clear_object (&self->container_at_creation);
 
   if (self->inhibit_cookie != 0)

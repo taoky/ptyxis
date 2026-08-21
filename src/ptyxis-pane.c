@@ -4,12 +4,14 @@
 #include "config.h"
 #include "ptyxis-enums.h"
 #include "ptyxis-pane.h"
+#include "ptyxis-tab-monitor.h"
 
 struct _PtyxisPane
 {
   GtkWidget parent_instance;
   PtyxisProfile *profile;
   PtyxisIpcProcess *process;
+  PtyxisTabMonitor *monitor;
   PtyxisTerminal *terminal;
   PtyxisZoomLevel zoom;
 };
@@ -18,6 +20,7 @@ enum {
   PROP_0,
   PROP_PROFILE,
   PROP_PROCESS,
+  PROP_MONITOR,
   PROP_ZOOM,
   N_PROPS
 };
@@ -35,6 +38,7 @@ ptyxis_pane_dispose (GObject *object)
   self->terminal = NULL;
   g_clear_object (&self->profile);
   g_clear_object (&self->process);
+  g_clear_object (&self->monitor);
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
 
@@ -57,6 +61,10 @@ ptyxis_pane_get_property (GObject    *object,
 
     case PROP_PROCESS:
       g_value_set_object (value, self->process);
+      break;
+
+    case PROP_MONITOR:
+      g_value_set_object (value, self->monitor);
       break;
 
     case PROP_ZOOM:
@@ -110,6 +118,11 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
   properties[PROP_PROCESS] =
     g_param_spec_object ("process", NULL, NULL,
                          PTYXIS_IPC_TYPE_PROCESS,
+                         (G_PARAM_READABLE |
+                          G_PARAM_STATIC_STRINGS));
+  properties[PROP_MONITOR] =
+    g_param_spec_object ("monitor", NULL, NULL,
+                         PTYXIS_TYPE_TAB_MONITOR,
                          (G_PARAM_READABLE |
                           G_PARAM_STATIC_STRINGS));
   properties[PROP_ZOOM] =
@@ -168,6 +181,24 @@ ptyxis_pane_set_process (PtyxisPane       *self,
 
   if (g_set_object (&self->process, process))
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS]);
+}
+
+PtyxisTabMonitor *
+ptyxis_pane_get_monitor (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->monitor;
+}
+
+void
+ptyxis_pane_set_monitor (PtyxisPane       *self,
+                         PtyxisTabMonitor *monitor)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (monitor == NULL || PTYXIS_IS_TAB_MONITOR (monitor));
+
+  if (g_set_object (&self->monitor, monitor))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_MONITOR]);
 }
 
 PtyxisPane *
