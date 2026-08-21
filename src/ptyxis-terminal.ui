@@ -226,6 +226,28 @@
     </section>
     <section>
       <item>
+        <attribute name="label" translatable="yes">Split _Horizontally</attribute>
+        <attribute name="action">tab.split-horizontal</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Split _Vertically</attribute>
+        <attribute name="action">tab.split-vertical</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Focus _Next Pane</attribute>
+        <attribute name="action">tab.focus-pane-next</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Focus _Previous Pane</attribute>
+        <attribute name="action">tab.focus-pane-previous</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">_Close Pane</attribute>
+        <attribute name="action">tab.close-pane</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="id">reset</attribute>
         <attribute name="label" translatable="yes">Reset</attribute>
         <attribute name="action">tab.reset</attribute>
