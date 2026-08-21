@@ -1579,6 +1579,14 @@ ptyxis_tab_get_profile (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
+  /* GtkBuilder may evaluate bindings in the terminal subtree before the
+   * template child pointer for the containing pane has been assigned.
+   * The construct-only profile property is applied after instance init and
+   * will notify the binding once the pane is available.
+   */
+  if (self->pane == NULL)
+    return NULL;
+
   return ptyxis_pane_get_profile (self->pane);
 }
 
