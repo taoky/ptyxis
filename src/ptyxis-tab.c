@@ -118,6 +118,10 @@ static void ptyxis_tab_update_scrollback_lines (PtyxisTab *self);
 static void ptyxis_tab_update_cell_height_scale (PtyxisTab *self);
 static void ptyxis_tab_update_cell_width_scale (PtyxisTab *self);
 static void ptyxis_tab_update_custom_links (PtyxisTab *self);
+static void ptyxis_pane_update_scrollback_lines (PtyxisPane *pane);
+static void ptyxis_pane_update_cell_height_scale (PtyxisPane *pane);
+static void ptyxis_pane_update_cell_width_scale (PtyxisPane *pane);
+static void ptyxis_pane_update_custom_links (PtyxisPane *pane);
 static gboolean ptyxis_tab_active_pane_is_running (PtyxisTab *self, char **cmdline);
 
 static void
@@ -141,9 +145,9 @@ ptyxis_tab_update_split_sizing (PtyxisTab *self)
       gtk_scrolled_window_set_propagate_natural_height (scroller, propagate_natural);
     }
 }
-static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
-                                                PtyxisProfile *profile,
-                                                GSignalGroup  *group);
+static void ptyxis_pane_profile_signals_bind_cb (PtyxisPane    *pane,
+                                                 PtyxisProfile *profile,
+                                                 GSignalGroup  *group);
 static void ptyxis_tab_commit_cb (PtyxisTab *, const char *, guint, PtyxisTerminal *);
 static void ptyxis_tab_notify_palette_cb (PtyxisTab *, GParamSpec *, PtyxisTerminal *);
 static void ptyxis_tab_notify_window_title_cb (PtyxisTab *, GParamSpec *, PtyxisTerminal *);
@@ -322,33 +326,33 @@ ptyxis_tab_connect_pane (PtyxisTab  *self,
 
   g_signal_connect_object (ptyxis_pane_get_profile_signals (pane),
                            "bind",
-                           G_CALLBACK (ptyxis_tab_profile_signals_bind_cb),
-                           self,
+                           G_CALLBACK (ptyxis_pane_profile_signals_bind_cb),
+                           pane,
                            G_CONNECT_SWAPPED);
   g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
                                  "notify::limit-scrollback",
-                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
-                                 self,
+                                 G_CALLBACK (ptyxis_pane_update_scrollback_lines),
+                                 pane,
                                  G_CONNECT_SWAPPED);
   g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
                                  "notify::scrollback-lines",
-                                 G_CALLBACK (ptyxis_tab_update_scrollback_lines),
-                                 self,
+                                 G_CALLBACK (ptyxis_pane_update_scrollback_lines),
+                                 pane,
                                  G_CONNECT_SWAPPED);
   g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
                                  "notify::cell-height-scale",
-                                 G_CALLBACK (ptyxis_tab_update_cell_height_scale),
-                                 self,
+                                 G_CALLBACK (ptyxis_pane_update_cell_height_scale),
+                                 pane,
                                  G_CONNECT_SWAPPED);
   g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
                                  "notify::cell-width-scale",
-                                 G_CALLBACK (ptyxis_tab_update_cell_width_scale),
-                                 self,
+                                 G_CALLBACK (ptyxis_pane_update_cell_width_scale),
+                                 pane,
                                  G_CONNECT_SWAPPED);
   g_signal_group_connect_object (ptyxis_pane_get_profile_signals (pane),
                                  "custom-links-changed",
-                                 G_CALLBACK (ptyxis_tab_update_custom_links),
-                                 self,
+                                 G_CALLBACK (ptyxis_pane_update_custom_links),
+                                 pane,
                                  G_CONNECT_SWAPPED);
 }
 
@@ -496,53 +500,83 @@ ptyxis_tab_is_active (PtyxisTab *self)
 }
 
 static void
-ptyxis_tab_update_scrollback_lines (PtyxisTab *self)
+ptyxis_pane_update_scrollback_lines (PtyxisPane *pane)
 {
   long scrollback_lines = -1;
+  PtyxisProfile *profile;
 
-  g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
 
-  if (ptyxis_profile_get_limit_scrollback (ptyxis_tab_get_profile (self)))
-    scrollback_lines = ptyxis_profile_get_scrollback_lines (ptyxis_tab_get_profile (self));
+  profile = ptyxis_pane_get_profile (pane);
+  if (ptyxis_profile_get_limit_scrollback (profile))
+    scrollback_lines = ptyxis_profile_get_scrollback_lines (profile);
 
-  vte_terminal_set_scrollback_lines (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), scrollback_lines);
+  vte_terminal_set_scrollback_lines (VTE_TERMINAL (ptyxis_pane_get_terminal (pane)), scrollback_lines);
+}
+
+static void
+ptyxis_pane_update_cell_height_scale (PtyxisPane *pane)
+{
+  double cell_height_scale = 1.0;
+  PtyxisProfile *profile;
+
+  g_assert (PTYXIS_IS_PANE (pane));
+
+  profile = ptyxis_pane_get_profile (pane);
+  if (ptyxis_profile_get_cell_height_scale (profile))
+    cell_height_scale = ptyxis_profile_get_cell_height_scale (profile);
+
+  vte_terminal_set_cell_height_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (pane)), cell_height_scale);
+}
+
+static void
+ptyxis_pane_update_cell_width_scale (PtyxisPane *pane)
+{
+  double cell_width_scale = 1.0;
+  PtyxisProfile *profile;
+
+  g_assert (PTYXIS_IS_PANE (pane));
+
+  profile = ptyxis_pane_get_profile (pane);
+  if (ptyxis_profile_get_cell_width_scale (profile))
+    cell_width_scale = ptyxis_profile_get_cell_width_scale (profile);
+
+  vte_terminal_set_cell_width_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (pane)), cell_width_scale);
+}
+
+static void
+ptyxis_pane_update_custom_links (PtyxisPane *pane)
+{
+  g_autoptr(GListModel) custom_links_list = NULL;
+
+  g_assert (PTYXIS_IS_PANE (pane));
+
+  custom_links_list = ptyxis_profile_list_custom_links (ptyxis_pane_get_profile (pane));
+  ptyxis_terminal_update_custom_links_list (ptyxis_pane_get_terminal (pane), custom_links_list);
+}
+
+static void
+ptyxis_tab_update_scrollback_lines (PtyxisTab *self)
+{
+  ptyxis_pane_update_scrollback_lines (self->active_pane);
 }
 
 static void
 ptyxis_tab_update_cell_height_scale (PtyxisTab *self)
 {
-  double cell_height_scale = 1.0;
-
-  g_assert (PTYXIS_IS_TAB (self));
-
-  if (ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self)))
-    cell_height_scale = ptyxis_profile_get_cell_height_scale (ptyxis_tab_get_profile (self));
-
-  vte_terminal_set_cell_height_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), cell_height_scale);
+  ptyxis_pane_update_cell_height_scale (self->active_pane);
 }
 
 static void
 ptyxis_tab_update_cell_width_scale (PtyxisTab *self)
 {
-  double cell_width_scale = 1.0;
-
-  g_assert (PTYXIS_IS_TAB (self));
-
-  if (ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self)))
-    cell_width_scale = ptyxis_profile_get_cell_width_scale (ptyxis_tab_get_profile (self));
-
-  vte_terminal_set_cell_width_scale (VTE_TERMINAL (ptyxis_pane_get_terminal (self->active_pane)), cell_width_scale);
+  ptyxis_pane_update_cell_width_scale (self->active_pane);
 }
 
 static void
 ptyxis_tab_update_custom_links (PtyxisTab *self)
 {
-  g_autoptr(GListModel) custom_links_list = NULL;
-
-  g_assert (PTYXIS_IS_TAB (self));
-
-  custom_links_list = ptyxis_profile_list_custom_links(ptyxis_tab_get_profile (self));
-  ptyxis_terminal_update_custom_links_list(ptyxis_pane_get_terminal (self->active_pane), custom_links_list);
+  ptyxis_pane_update_custom_links (self->active_pane);
 }
 
 static void
@@ -1459,19 +1493,19 @@ ptyxis_tab_constructed (GObject *object)
 }
 
 static void
-ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
+ptyxis_pane_profile_signals_bind_cb (PtyxisPane    *pane,
                                     PtyxisProfile *profile,
                                     GSignalGroup  *group)
 {
-  g_assert (PTYXIS_IS_TAB (self));
+  g_assert (PTYXIS_IS_PANE (pane));
   g_assert (PTYXIS_IS_PROFILE (profile));
   g_assert (G_IS_SIGNAL_GROUP (group));
 
   /* Trigger all update functions when profile changes */
-  ptyxis_tab_update_scrollback_lines (self);
-  ptyxis_tab_update_cell_height_scale (self);
-  ptyxis_tab_update_cell_width_scale (self);
-  ptyxis_tab_update_custom_links (self);
+  ptyxis_pane_update_scrollback_lines (pane);
+  ptyxis_pane_update_cell_height_scale (pane);
+  ptyxis_pane_update_cell_width_scale (pane);
+  ptyxis_pane_update_custom_links (pane);
 }
 
 static void
