@@ -141,12 +141,18 @@ static void
 ptyxis_tab_connect_pane (PtyxisTab  *self,
                          PtyxisPane *pane)
 {
+  g_autoptr(PtyxisTabMonitor) monitor = NULL;
   PtyxisTerminal *terminal;
 
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_PANE (pane));
 
   terminal = ptyxis_pane_get_terminal (pane);
+  if (ptyxis_pane_get_monitor (pane) == NULL)
+    {
+      monitor = ptyxis_tab_monitor_new (self);
+      ptyxis_pane_set_monitor (pane, monitor);
+    }
   g_signal_connect_object (pane, "focus-entered",
                            G_CALLBACK (ptyxis_tab_pane_focus_entered_cb),
                            self, G_CONNECT_SWAPPED);
@@ -1038,11 +1044,6 @@ ptyxis_tab_constructed (GObject *object)
                            G_CONNECT_SWAPPED);
   ptyxis_tab_update_inhibit (self);
 
-  {
-    g_autoptr(PtyxisTabMonitor) monitor = ptyxis_tab_monitor_new (self);
-
-    ptyxis_pane_set_monitor (self->pane, monitor);
-  }
 }
 
 static void
