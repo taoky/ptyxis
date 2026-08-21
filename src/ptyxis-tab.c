@@ -88,6 +88,7 @@ enum {
 };
 
 static void ptyxis_tab_respawn (PtyxisTab *self);
+static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
@@ -192,6 +193,33 @@ static XdpPortal *portal;
 
 static GParamSpec *properties[N_PROPS];
 static guint signals[N_SIGNALS];
+
+typedef struct
+{
+  PtyxisTab *tab;
+  PtyxisPane *pane;
+} PtyxisTabPaneCall;
+
+static PtyxisTabPaneCall *
+ptyxis_tab_pane_call_new (PtyxisTab  *tab,
+                          PtyxisPane *pane)
+{
+  PtyxisTabPaneCall *call = g_new0 (PtyxisTabPaneCall, 1);
+
+  call->tab = g_object_ref (tab);
+  call->pane = g_object_ref (pane);
+  return call;
+}
+
+static void
+ptyxis_tab_pane_call_free (PtyxisTabPaneCall *call)
+{
+  g_clear_object (&call->tab);
+  g_clear_object (&call->pane);
+  g_free (call);
+}
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (PtyxisTabPaneCall, ptyxis_tab_pane_call_free)
 static double zoom_font_scales[] = {
   0,
 
@@ -371,7 +399,8 @@ ptyxis_tab_update_custom_links (PtyxisTab *self)
 }
 
 static void
-ptyxis_tab_update_inhibit (PtyxisTab *self)
+ptyxis_tab_update_inhibit_pane (PtyxisTab  *self,
+                                PtyxisPane *pane)
 {
   PtyxisSettings *settings;
   gboolean inhibit = FALSE;
@@ -384,25 +413,25 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
   /* Clear if the user has disabled logout inhibition */
   if (!ptyxis_settings_get_inhibit_logout (settings))
     {
-      if (ptyxis_pane_get_inhibit_cookie (self->pane))
+      if (ptyxis_pane_get_inhibit_cookie (pane))
         {
           gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                     ptyxis_pane_get_inhibit_cookie (self->pane));
-          ptyxis_pane_set_inhibit_cookie (self->pane, 0);
+                                     ptyxis_pane_get_inhibit_cookie (pane));
+          ptyxis_pane_set_inhibit_cookie (pane, 0);
         }
 
       return;
     }
 
   /* Only inhibit if there's a foreground process running and it's not a shell */
-  if (ptyxis_pane_get_has_foreground_process (self->pane) &&
-      ptyxis_pane_get_program_name (self->pane) != NULL &&
-      !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane)))
+  if (ptyxis_pane_get_has_foreground_process (pane) &&
+      ptyxis_pane_get_program_name (pane) != NULL &&
+      !ptyxis_is_shell (ptyxis_pane_get_program_name (pane)))
     inhibit = TRUE;
 
   /* Check if we need to change the inhibit state */
-  if ((inhibit && ptyxis_pane_get_inhibit_cookie (self->pane) != 0) ||
-      (!inhibit && ptyxis_pane_get_inhibit_cookie (self->pane) == 0))
+  if ((inhibit && ptyxis_pane_get_inhibit_cookie (pane) != 0) ||
+      (!inhibit && ptyxis_pane_get_inhibit_cookie (pane) == 0))
     return;
 
   /* Get the window to use for the inhibit call */
@@ -414,7 +443,7 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
       if (window != NULL)
         {
           ptyxis_pane_set_inhibit_cookie (
-            self->pane,
+            pane,
             gtk_application_inhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                      GTK_WINDOW (window),
                                      GTK_APPLICATION_INHIBIT_LOGOUT,
@@ -424,9 +453,16 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
   else
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                 ptyxis_pane_get_inhibit_cookie (self->pane));
-      ptyxis_pane_set_inhibit_cookie (self->pane, 0);
+                                 ptyxis_pane_get_inhibit_cookie (pane));
+      ptyxis_pane_set_inhibit_cookie (pane, 0);
     }
+}
+
+static void
+ptyxis_tab_update_inhibit (PtyxisTab *self)
+{
+  g_assert (PTYXIS_IS_TAB (self));
+  ptyxis_tab_update_inhibit_pane (self, self->active_pane);
 }
 
 static void
@@ -435,8 +471,11 @@ ptyxis_tab_wait_cb (GObject      *object,
                     gpointer      user_data)
 {
   PtyxisApplication *app = (PtyxisApplication *)object;
-  g_autoptr(PtyxisTab) self = user_data;
+  g_autoptr(PtyxisTabPaneCall) call = user_data;
   g_autoptr(GError) error = NULL;
+  PtyxisTab *self = call->tab;
+  PtyxisPane *pane = call->pane;
+  AdwBanner *banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
   PtyxisExitAction exit_action;
   PtyxisWindow *window;
   AdwTabPage *page = NULL;
@@ -447,12 +486,12 @@ ptyxis_tab_wait_cb (GObject      *object,
   g_assert (PTYXIS_IS_APPLICATION (app));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_RUNNING);
+  g_assert (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_RUNNING);
 
-  ptyxis_pane_set_process (self->pane, NULL);
+  ptyxis_pane_set_process (pane, NULL);
 
   /* Update inhibit state when process exits */
-  ptyxis_tab_update_inhibit (self);
+  ptyxis_tab_update_inhibit_pane (self, pane);
 
   exit_code = ptyxis_application_wait_finish (app, result, &error);
 
@@ -461,11 +500,11 @@ ptyxis_tab_wait_cb (GObject      *object,
            error ? error->message : "");
 
   if (error == NULL && WIFEXITED (exit_code) && WEXITSTATUS (exit_code) == 0)
-    ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_EXITED);
+    ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_EXITED);
   else
-    ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
+    ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_FAILED);
 
-  if (ptyxis_pane_get_forced_exit (self->pane))
+  if (ptyxis_pane_get_forced_exit (pane))
     return;
 
   if ((window = PTYXIS_WINDOW (gtk_widget_get_ancestor (GTK_WIDGET (self), PTYXIS_TYPE_WINDOW))))
@@ -477,20 +516,20 @@ ptyxis_tab_wait_cb (GObject      *object,
 
       title = g_strdup_printf (_("Process Exited from Signal %d"), WTERMSIG (exit_code));
 
-      adw_banner_set_title (self->banner, title);
-      adw_banner_set_button_label (self->banner, _("_Restart"));
-      gtk_actionable_set_action_name (GTK_ACTIONABLE (self->banner), "tab.respawn");
-      gtk_widget_set_visible (GTK_WIDGET (self->banner), TRUE);
+      adw_banner_set_title (banner, title);
+      adw_banner_set_button_label (banner, _("_Restart"));
+      gtk_actionable_set_action_name (GTK_ACTIONABLE (banner), "tab.respawn");
+      gtk_widget_set_visible (GTK_WIDGET (banner), TRUE);
       return;
     }
 
-  exit_action = ptyxis_profile_get_exit_action (ptyxis_tab_get_profile (self));
+  exit_action = ptyxis_profile_get_exit_action (ptyxis_pane_get_profile (pane));
   tab_view = gtk_widget_get_ancestor (GTK_WIDGET (self), ADW_TYPE_TAB_VIEW);
 
   /* If this was started with something like ptyxis_window_new_for_command()
    * then we just want to exit the application (so allow tab to close).
    */
-  if (ptyxis_pane_get_command (self->pane) != NULL)
+  if (ptyxis_pane_get_command (pane) != NULL)
     exit_action = PTYXIS_EXIT_ACTION_CLOSE;
 
   if (ADW_IS_TAB_VIEW (tab_view))
@@ -500,24 +539,24 @@ ptyxis_tab_wait_cb (GObject      *object,
    * display it again if the tab is removed from the parking lot and
    * restored into the window.
    */
-  adw_banner_set_title (self->banner, _("Process Exited"));
-  adw_banner_set_button_label (self->banner, _("_Restart"));
-  gtk_actionable_set_action_name (GTK_ACTIONABLE (self->banner), "tab.respawn");
+  adw_banner_set_title (banner, _("Process Exited"));
+  adw_banner_set_button_label (banner, _("_Restart"));
+  gtk_actionable_set_action_name (GTK_ACTIONABLE (banner), "tab.respawn");
 
   /* If we took less than .5 a second to spawn and no key has been
    * pressed in the terminal, then treat this as a failed spawn. Don't
    * allow ourselves to auto-close in that case as it's likely an error
    * the user would want to see.
    */
-  if ((ptyxis_pane_get_command (self->pane) == NULL || ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED) &&
-      (g_get_monotonic_time () - ptyxis_pane_get_respawn_time (self->pane)) < (G_USEC_PER_SEC/2) &&
-      !ptyxis_tab_monitor_get_has_pressed_key (ptyxis_pane_get_monitor (self->pane)))
+  if ((ptyxis_pane_get_command (pane) == NULL || ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_FAILED) &&
+      (g_get_monotonic_time () - ptyxis_pane_get_respawn_time (pane)) < (G_USEC_PER_SEC/2) &&
+      !ptyxis_tab_monitor_get_has_pressed_key (ptyxis_pane_get_monitor (pane)))
     exit_action = PTYXIS_EXIT_ACTION_NONE;
 
   switch (exit_action)
     {
     case PTYXIS_EXIT_ACTION_RESTART:
-      ptyxis_tab_respawn (self);
+      ptyxis_tab_respawn_pane (self, pane);
       break;
 
     case PTYXIS_EXIT_ACTION_CLOSE:
@@ -530,9 +569,9 @@ ptyxis_tab_wait_cb (GObject      *object,
       break;
 
     case PTYXIS_EXIT_ACTION_NONE:
-      gtk_widget_set_visible (GTK_WIDGET (self->banner), TRUE);
+      gtk_widget_set_visible (GTK_WIDGET (banner), TRUE);
       if (is_front)
-        gtk_widget_child_focus (GTK_WIDGET (self->banner), GTK_DIR_TAB_FORWARD);
+        gtk_widget_child_focus (GTK_WIDGET (banner), GTK_DIR_TAB_FORWARD);
       break;
 
     default:
@@ -549,36 +588,40 @@ ptyxis_tab_spawn_cb (GObject      *object,
 {
   PtyxisApplication *app = (PtyxisApplication *)object;
   g_autoptr(PtyxisIpcProcess) process = NULL;
-  g_autoptr(PtyxisTab) self = user_data;
+  g_autoptr(PtyxisTabPaneCall) call = user_data;
   g_autoptr(GError) error = NULL;
+  PtyxisTab *self = call->tab;
+  PtyxisPane *pane = call->pane;
+  PtyxisTerminal *terminal = ptyxis_pane_get_terminal (pane);
+  AdwBanner *banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
 
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_SPAWNING);
+  g_assert (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_SPAWNING);
 
   if (!(process = ptyxis_application_spawn_finish (app, result, &error)))
     {
-      const char *profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
+      const char *profile_uuid = ptyxis_profile_get_uuid (ptyxis_pane_get_profile (pane));
 
-      ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
+      ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_FAILED);
 
-      vte_terminal_feed (VTE_TERMINAL (self->terminal), error->message, -1);
-      vte_terminal_feed (VTE_TERMINAL (self->terminal), "\r\n", -1);
+      vte_terminal_feed (VTE_TERMINAL (terminal), error->message, -1);
+      vte_terminal_feed (VTE_TERMINAL (terminal), "\r\n", -1);
 
-      adw_banner_set_title (self->banner, _("Failed to launch terminal"));
-      adw_banner_set_button_label (self->banner, _("Edit Profile"));
-      gtk_actionable_set_action_target (GTK_ACTIONABLE (self->banner), "s", profile_uuid);
-      gtk_actionable_set_action_name (GTK_ACTIONABLE (self->banner), "app.edit-profile");
-      gtk_widget_set_visible (GTK_WIDGET (self->banner), TRUE);
+      adw_banner_set_title (banner, _("Failed to launch terminal"));
+      adw_banner_set_button_label (banner, _("Edit Profile"));
+      gtk_actionable_set_action_target (GTK_ACTIONABLE (banner), "s", profile_uuid);
+      gtk_actionable_set_action_name (GTK_ACTIONABLE (banner), "app.edit-profile");
+      gtk_widget_set_visible (GTK_WIDGET (banner), TRUE);
 
       return;
     }
 
-  ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_RUNNING);
-  ptyxis_pane_set_respawn_time (self->pane, g_get_monotonic_time ());
+  ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_RUNNING);
+  ptyxis_pane_set_respawn_time (pane, g_get_monotonic_time ());
 
-  ptyxis_pane_set_process (self->pane, process);
+  ptyxis_pane_set_process (pane, process);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
 
@@ -586,11 +629,12 @@ ptyxis_tab_spawn_cb (GObject      *object,
                                  process,
                                  NULL,
                                  ptyxis_tab_wait_cb,
-                                 g_object_ref (self));
+                                 ptyxis_tab_pane_call_new (self, pane));
 }
 
 static void
-ptyxis_tab_respawn (PtyxisTab *self)
+ptyxis_tab_respawn_pane (PtyxisTab  *self,
+                         PtyxisPane *pane)
 {
   g_autofree char *default_container = NULL;
   g_autoptr(PtyxisIpcContainer) container = NULL;
@@ -599,20 +643,22 @@ ptyxis_tab_respawn (PtyxisTab *self)
   PtyxisApplication *app;
   const char *profile_uuid;
   const char *cwd_uri;
+  PtyxisTerminal *terminal = ptyxis_pane_get_terminal (pane);
+  AdwBanner *banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
   VtePty *pty;
 
   g_assert (PTYXIS_IS_TAB (self));
-  g_assert (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_INITIAL ||
-            ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED ||
-            ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED);
+  g_assert (ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_INITIAL ||
+            ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_EXITED ||
+            ptyxis_pane_get_state (pane) == PTYXIS_PANE_STATE_FAILED);
 
-  gtk_widget_set_visible (GTK_WIDGET (self->banner), FALSE);
+  gtk_widget_set_visible (GTK_WIDGET (banner), FALSE);
 
   app = PTYXIS_APPLICATION_DEFAULT;
-  profile_uuid = ptyxis_profile_get_uuid (ptyxis_tab_get_profile (self));
-  default_container = ptyxis_profile_dup_default_container (ptyxis_tab_get_profile (self));
+  profile_uuid = ptyxis_profile_get_uuid (ptyxis_pane_get_profile (pane));
+  default_container = ptyxis_profile_dup_default_container (ptyxis_pane_get_profile (pane));
 
-  container_at_creation = ptyxis_pane_dup_container (self->pane);
+  container_at_creation = ptyxis_pane_dup_container (pane);
   if (container_at_creation != NULL)
     container = g_object_ref (container_at_creation);
   else
@@ -622,21 +668,21 @@ ptyxis_tab_respawn (PtyxisTab *self)
     {
       g_autofree char *title = NULL;
 
-      ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
+      ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_FAILED);
 
       title = g_strdup_printf (_("Cannot locate container “%s”"), default_container);
-      adw_banner_set_title (self->banner, title);
-      adw_banner_set_button_label (self->banner, _("Edit Profile"));
-      gtk_actionable_set_action_target (GTK_ACTIONABLE (self->banner), "s", profile_uuid);
-      gtk_actionable_set_action_name (GTK_ACTIONABLE (self->banner), "app.edit-profile");
-      gtk_widget_set_visible (GTK_WIDGET (self->banner), TRUE);
+      adw_banner_set_title (banner, title);
+      adw_banner_set_button_label (banner, _("Edit Profile"));
+      gtk_actionable_set_action_target (GTK_ACTIONABLE (banner), "s", profile_uuid);
+      gtk_actionable_set_action_name (GTK_ACTIONABLE (banner), "app.edit-profile");
+      gtk_widget_set_visible (GTK_WIDGET (banner), TRUE);
 
       return;
     }
 
-  ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_SPAWNING);
+  ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_SPAWNING);
 
-  pty = vte_terminal_get_pty (VTE_TERMINAL (self->terminal));
+  pty = vte_terminal_get_pty (VTE_TERMINAL (terminal));
 
   if (pty == NULL)
     {
@@ -646,36 +692,43 @@ ptyxis_tab_respawn (PtyxisTab *self)
 
       if (new_pty == NULL)
         {
-          ptyxis_pane_set_state (self->pane, PTYXIS_PANE_STATE_FAILED);
+          ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_FAILED);
 
-          adw_banner_set_title (self->banner, _("Failed to create pseudo terminal device"));
-          adw_banner_set_button_label (self->banner, NULL);
-          gtk_actionable_set_action_name (GTK_ACTIONABLE (self->banner), NULL);
-          gtk_widget_set_visible (GTK_WIDGET (self->banner), TRUE);
+          adw_banner_set_title (banner, _("Failed to create pseudo terminal device"));
+          adw_banner_set_button_label (banner, NULL);
+          gtk_actionable_set_action_name (GTK_ACTIONABLE (banner), NULL);
+          gtk_widget_set_visible (GTK_WIDGET (banner), TRUE);
 
           return;
         }
 
-      vte_terminal_set_pty (VTE_TERMINAL (self->terminal), new_pty);
+      vte_terminal_set_pty (VTE_TERMINAL (terminal), new_pty);
 
       pty = new_pty;
     }
 
-  cwd_uri = ptyxis_pane_get_previous_working_directory_uri (self->pane);
-  if (ptyxis_pane_get_initial_working_directory_uri (self->pane))
-    cwd_uri = ptyxis_pane_get_initial_working_directory_uri (self->pane);
+  cwd_uri = ptyxis_pane_get_previous_working_directory_uri (pane);
+  if (ptyxis_pane_get_initial_working_directory_uri (pane))
+    cwd_uri = ptyxis_pane_get_initial_working_directory_uri (pane);
 
   ptyxis_application_spawn_async (PTYXIS_APPLICATION_DEFAULT,
                                   container,
-                                  ptyxis_tab_get_profile (self),
+                                  ptyxis_pane_get_profile (pane),
                                   cwd_uri,
                                   pty,
-                                  ptyxis_pane_get_command (self->pane),
+                                  ptyxis_pane_get_command (pane),
                                   NULL,
                                   ptyxis_tab_spawn_cb,
-                                  g_object_ref (self));
+                                  ptyxis_tab_pane_call_new (self, pane));
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+}
+
+static void
+ptyxis_tab_respawn (PtyxisTab *self)
+{
+  g_assert (PTYXIS_IS_TAB (self));
+  ptyxis_tab_respawn_pane (self, self->active_pane);
 }
 
 static void
@@ -687,8 +740,8 @@ ptyxis_tab_respawn_action (GtkWidget  *widget,
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  if (ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_FAILED ||
-      ptyxis_pane_get_state (self->pane) == PTYXIS_PANE_STATE_EXITED)
+  if (ptyxis_pane_get_state (self->active_pane) == PTYXIS_PANE_STATE_FAILED ||
+      ptyxis_pane_get_state (self->active_pane) == PTYXIS_PANE_STATE_EXITED)
     ptyxis_tab_respawn (self);
 }
 
