@@ -1228,7 +1228,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_READ_ONLY:
-      g_value_set_boolean (value, !vte_terminal_get_input_enabled (VTE_TERMINAL (self->terminal)));
+      g_value_set_boolean (value, ptyxis_pane_get_read_only (self->pane));
       break;
 
     case PROP_SUBTITLE:
@@ -1279,7 +1279,7 @@ ptyxis_tab_set_property (GObject      *object,
       break;
 
     case PROP_READ_ONLY:
-      vte_terminal_set_input_enabled (VTE_TERMINAL (self->terminal), !g_value_get_boolean (value));
+      ptyxis_pane_set_read_only (self->pane, g_value_get_boolean (value));
       break;
 
     case PROP_TITLE_PREFIX:

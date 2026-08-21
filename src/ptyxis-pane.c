@@ -33,9 +33,14 @@ struct _PtyxisPane
 
 enum {
   PROP_0,
+  PROP_COMMAND_LINE,
+  PROP_HAS_FOREGROUND_PROCESS,
+  PROP_PROCESS_LEADER_KIND,
   PROP_PROFILE,
   PROP_PROCESS,
   PROP_MONITOR,
+  PROP_READ_ONLY,
+  PROP_UUID,
   PROP_ZOOM,
   N_PROPS
 };
@@ -88,12 +93,32 @@ ptyxis_pane_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_COMMAND_LINE:
+      g_value_set_string (value, self->command_line);
+      break;
+
+    case PROP_HAS_FOREGROUND_PROCESS:
+      g_value_set_boolean (value, self->has_foreground_process);
+      break;
+
+    case PROP_PROCESS_LEADER_KIND:
+      g_value_set_enum (value, self->leader_kind);
+      break;
+
     case PROP_PROFILE:
       g_value_set_object (value, self->profile);
       break;
 
     case PROP_PROCESS:
       g_value_set_object (value, self->process);
+      break;
+
+    case PROP_READ_ONLY:
+      g_value_set_boolean (value, ptyxis_pane_get_read_only (self));
+      break;
+
+    case PROP_UUID:
+      g_value_set_string (value, self->uuid);
       break;
 
     case PROP_MONITOR:
@@ -123,6 +148,10 @@ ptyxis_pane_set_property (GObject      *object,
       ptyxis_pane_set_profile (self, g_value_get_object (value));
       break;
 
+    case PROP_READ_ONLY:
+      ptyxis_pane_set_read_only (self, g_value_get_boolean (value));
+      break;
+
     case PROP_ZOOM:
       ptyxis_pane_set_zoom (self, g_value_get_enum (value));
       break;
@@ -143,6 +172,18 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
   object_class->get_property = ptyxis_pane_get_property;
   object_class->set_property = ptyxis_pane_set_property;
 
+  properties[PROP_COMMAND_LINE] =
+    g_param_spec_string ("command-line", NULL, NULL, NULL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  properties[PROP_HAS_FOREGROUND_PROCESS] =
+    g_param_spec_boolean ("has-foreground-process", NULL, NULL, FALSE,
+                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  properties[PROP_PROCESS_LEADER_KIND] =
+    g_param_spec_enum ("process-leader-kind", NULL, NULL,
+                       PTYXIS_TYPE_PROCESS_LEADER_KIND,
+                       PTYXIS_PROCESS_LEADER_KIND_UNKNOWN,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
   properties[PROP_PROFILE] =
     g_param_spec_object ("profile", NULL, NULL,
                          PTYXIS_TYPE_PROFILE,
@@ -159,6 +200,14 @@ ptyxis_pane_class_init (PtyxisPaneClass *klass)
                          PTYXIS_TYPE_TAB_MONITOR,
                          (G_PARAM_READABLE |
                           G_PARAM_STATIC_STRINGS));
+  properties[PROP_READ_ONLY] =
+    g_param_spec_boolean ("read-only", NULL, NULL, FALSE,
+                          (G_PARAM_READWRITE |
+                           G_PARAM_EXPLICIT_NOTIFY |
+                           G_PARAM_STATIC_STRINGS));
+  properties[PROP_UUID] =
+    g_param_spec_string ("uuid", NULL, NULL, NULL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
   properties[PROP_ZOOM] =
     g_param_spec_enum ("zoom", NULL, NULL,
                        PTYXIS_TYPE_ZOOM_LEVEL,
@@ -364,7 +413,12 @@ ptyxis_pane_set_has_foreground_process (PtyxisPane *self,
                                         gboolean    has_foreground_process)
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
-  self->has_foreground_process = !!has_foreground_process;
+  has_foreground_process = !!has_foreground_process;
+  if (self->has_foreground_process != has_foreground_process)
+    {
+      self->has_foreground_process = has_foreground_process;
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_HAS_FOREGROUND_PROCESS]);
+    }
 }
 
 const char *
@@ -379,7 +433,8 @@ ptyxis_pane_set_command_line (PtyxisPane *self,
                               const char *command_line)
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
-  g_set_str (&self->command_line, command_line);
+  if (g_set_str (&self->command_line, command_line))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
 }
 
 const char *
@@ -411,7 +466,11 @@ ptyxis_pane_set_process_leader_kind (PtyxisPane              *self,
   g_return_if_fail (PTYXIS_IS_PANE (self));
   g_return_if_fail (kind >= PTYXIS_PROCESS_LEADER_KIND_UNKNOWN &&
                     kind <= PTYXIS_PROCESS_LEADER_KIND_CONTAINER);
-  self->leader_kind = kind;
+  if (self->leader_kind != kind)
+    {
+      self->leader_kind = kind;
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+    }
 }
 
 PtyxisPaneState
@@ -458,6 +517,27 @@ ptyxis_pane_set_forced_exit (PtyxisPane *self,
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
   self->forced_exit = !!forced_exit;
+}
+
+gboolean
+ptyxis_pane_get_read_only (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), FALSE);
+  return self->terminal != NULL &&
+         !vte_terminal_get_input_enabled (VTE_TERMINAL (self->terminal));
+}
+
+void
+ptyxis_pane_set_read_only (PtyxisPane *self,
+                           gboolean    read_only)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+
+  if (self->terminal != NULL && ptyxis_pane_get_read_only (self) != !!read_only)
+    {
+      vte_terminal_set_input_enabled (VTE_TERMINAL (self->terminal), !read_only);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_READ_ONLY]);
+    }
 }
 
 PtyxisPane *
