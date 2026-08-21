@@ -12,6 +12,14 @@ G_BEGIN_DECLS
 
 typedef struct _PtyxisTabMonitor PtyxisTabMonitor;
 
+typedef enum _PtyxisProcessLeader
+{
+  PTYXIS_PROCESS_LEADER_KIND_UNKNOWN,
+  PTYXIS_PROCESS_LEADER_KIND_SUPERUSER,
+  PTYXIS_PROCESS_LEADER_KIND_REMOTE,
+  PTYXIS_PROCESS_LEADER_KIND_CONTAINER,
+} PtyxisProcessLeaderKind;
+
 typedef enum _PtyxisZoomLevel
 {
   PTYXIS_ZOOM_LEVEL_MINUS_14 = 1,
@@ -95,6 +103,9 @@ void        ptyxis_pane_set_command_line (PtyxisPane *self,
 const char *ptyxis_pane_get_program_name (PtyxisPane *self);
 void        ptyxis_pane_set_program_name (PtyxisPane *self,
                                           const char *program_name);
+PtyxisProcessLeaderKind ptyxis_pane_get_process_leader_kind (PtyxisPane *self);
+void                    ptyxis_pane_set_process_leader_kind (PtyxisPane *self,
+                                                             PtyxisProcessLeaderKind kind);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 

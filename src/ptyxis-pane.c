@@ -24,6 +24,7 @@ struct _PtyxisPane
   char *command_line;
   char *program_name;
   GPid foreground_pid;
+  PtyxisProcessLeaderKind leader_kind : 3;
   guint has_foreground_process : 1;
 };
 
@@ -390,6 +391,23 @@ ptyxis_pane_set_program_name (PtyxisPane *self,
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
   g_set_str (&self->program_name, program_name);
+}
+
+PtyxisProcessLeaderKind
+ptyxis_pane_get_process_leader_kind (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), PTYXIS_PROCESS_LEADER_KIND_UNKNOWN);
+  return self->leader_kind;
+}
+
+void
+ptyxis_pane_set_process_leader_kind (PtyxisPane              *self,
+                                     PtyxisProcessLeaderKind  kind)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_return_if_fail (kind >= PTYXIS_PROCESS_LEADER_KIND_UNKNOWN &&
+                    kind <= PTYXIS_PROCESS_LEADER_KIND_CONTAINER);
+  self->leader_kind = kind;
 }
 
 PtyxisPane *

@@ -67,7 +67,6 @@ struct _PtyxisTab
 
   gint64                   respawn_time;
 
-  PtyxisProcessLeaderKind  leader_kind : 3;
   guint                    forced_exit : 1;
   guint                    ignore_osc_title : 1;
   guint                    ignore_snapshot : 1;
@@ -732,7 +731,7 @@ ptyxis_tab_dup_icon (PtyxisTab *self)
 
   g_assert (PTYXIS_IS_TAB (self));
 
-  kind = self->leader_kind;
+  kind = ptyxis_pane_get_process_leader_kind (self->pane);
 
   switch (kind)
     {
@@ -1227,7 +1226,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_PROCESS_LEADER_KIND:
-      g_value_set_enum (value, self->leader_kind);
+      g_value_set_enum (value, ptyxis_pane_get_process_leader_kind (self->pane));
       break;
 
     case PROP_PROGRESS:
@@ -2048,10 +2047,10 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
   else
     leader_kind = PTYXIS_PROCESS_LEADER_KIND_UNKNOWN;
 
-  if (self->leader_kind != leader_kind)
+  if (ptyxis_pane_get_process_leader_kind (self->pane) != leader_kind)
     {
       changed = TRUE;
-      self->leader_kind = leader_kind;
+      ptyxis_pane_set_process_leader_kind (self->pane, leader_kind);
 
       if (!ptyxis_tab_is_active (self))
         ptyxis_tab_set_needs_attention (self, TRUE);
@@ -2116,9 +2115,9 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
           g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
         }
 
-      if (self->leader_kind != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
+      if (ptyxis_pane_get_process_leader_kind (self->pane) != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
         {
-          self->leader_kind = PTYXIS_PROCESS_LEADER_KIND_UNKNOWN;
+          ptyxis_pane_set_process_leader_kind (self->pane, PTYXIS_PROCESS_LEADER_KIND_UNKNOWN);
           g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
         }
 
