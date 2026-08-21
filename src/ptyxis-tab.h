@@ -48,6 +48,7 @@ PtyxisPane         *ptyxis_tab_get_active_pane                    (PtyxisTab    
 void                ptyxis_tab_set_active_pane                    (PtyxisTab            *self,
                                                                    PtyxisPane           *pane);
 PtyxisSplitNode    *ptyxis_tab_get_split_root                     (PtyxisTab            *self);
+guint               ptyxis_tab_get_n_panes                        (PtyxisTab            *self);
 PtyxisTerminal     *ptyxis_tab_get_terminal                       (PtyxisTab            *self);
 PtyxisProfile      *ptyxis_tab_get_profile                        (PtyxisTab            *self);
 void                ptyxis_tab_apply_profile                      (PtyxisTab            *self,

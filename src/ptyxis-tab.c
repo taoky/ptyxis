@@ -1899,6 +1899,13 @@ ptyxis_tab_get_split_root (PtyxisTab *self)
   return self->split_root;
 }
 
+guint
+ptyxis_tab_get_n_panes (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), 0);
+  return ptyxis_split_node_count_leaves (self->split_root);
+}
+
 /**
  * ptyxis_tab_get_profile:
  * @self: a #PtyxisTab

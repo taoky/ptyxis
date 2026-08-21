@@ -114,7 +114,8 @@ ptyxis_window_save_size (PtyxisWindow *self)
 
   g_assert (PTYXIS_IS_WINDOW (self));
 
-  if ((active_tab = ptyxis_window_get_active_tab (self)))
+  if ((active_tab = ptyxis_window_get_active_tab (self)) &&
+      ptyxis_tab_get_n_panes (active_tab) == 1)
     {
       PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
       PtyxisTerminal *terminal = ptyxis_tab_get_terminal (active_tab);
@@ -564,9 +565,10 @@ ptyxis_window_apply_current_settings (PtyxisWindow *self,
 
       ptyxis_tab_set_zoom (tab, zoom);
 
-      vte_terminal_set_size (VTE_TERMINAL (ptyxis_tab_get_terminal (tab)),
-                             vte_terminal_get_column_count (VTE_TERMINAL (terminal)),
-                             vte_terminal_get_row_count (VTE_TERMINAL (terminal)));
+      if (ptyxis_tab_get_n_panes (active_tab) == 1)
+        vte_terminal_set_size (VTE_TERMINAL (ptyxis_tab_get_terminal (tab)),
+                               vte_terminal_get_column_count (VTE_TERMINAL (terminal)),
+                               vte_terminal_get_row_count (VTE_TERMINAL (terminal)));
     }
 }
 
