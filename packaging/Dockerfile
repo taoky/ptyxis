@@ -1,0 +1,99 @@
+# syntax=docker/dockerfile:1
+
+FROM debian:sid AS debian-build
+ARG DEBIAN_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    appstream build-essential debhelper devscripts dh-sequence-gnome \
+    desktop-file-utils gettext libadwaita-1-dev libglib2.0-dev \
+    libgtk-4-dev libjson-glib-dev libportal-gtk4-dev \
+    libvte-2.91-gtk4-dev libxml2-utils meson ninja-build pkgconf && \
+    rm -rf /var/lib/apt/lists/*
+COPY . /src
+WORKDIR /src
+RUN DEBFULLNAME="Ptyxis snapshot builder" \
+    DEBEMAIL="noreply@example.invalid" \
+    dch --newversion "$DEBIAN_VERSION" --distribution unstable \
+        "Build snapshot from the current repository." && \
+    dpkg-buildpackage --build=binary --no-sign && \
+    test -x debian/ptyxis/usr/bin/ptyxis && \
+    test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
+    mkdir -p /out && cp /ptyxis_*.deb /out/
+
+FROM scratch AS export-debian
+COPY --from=debian-build /out/ /
+
+FROM ubuntu:26.04 AS ubuntu-build
+ARG UBUNTU_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    appstream build-essential debhelper devscripts dh-sequence-gnome \
+    desktop-file-utils gettext libadwaita-1-dev libglib2.0-dev \
+    libgtk-4-dev libjson-glib-dev libportal-gtk4-dev \
+    libvte-2.91-gtk4-dev libxml2-utils meson ninja-build pkgconf && \
+    rm -rf /var/lib/apt/lists/*
+COPY . /src
+WORKDIR /src
+RUN DEBFULLNAME="Ptyxis snapshot builder" \
+    DEBEMAIL="noreply@example.invalid" \
+    dch --newversion "$UBUNTU_VERSION" --distribution resolute \
+        "Build snapshot from the current repository." && \
+    dpkg-buildpackage --build=binary --no-sign && \
+    test -x debian/ptyxis/usr/bin/ptyxis && \
+    test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
+    mkdir -p /out && cp /ptyxis_*.deb /out/
+
+FROM scratch AS export-ubuntu
+COPY --from=ubuntu-build /out/ /
+
+FROM fedora:44 AS fedora-build
+ARG BASE_VERSION
+ARG RPM_RELEASE
+RUN dnf install -y \
+    appstream desktop-file-utils gcc gettext git glib2-devel gtk4-devel \
+    json-glib-devel libadwaita-devel libportal-gtk4-devel meson \
+    ninja-build pkgconf-pkg-config rpm-build vte291-gtk4-devel && \
+    dnf clean all
+COPY . /src
+WORKDIR /src
+RUN mkdir -p /root/rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} && \
+    tar --transform "s,^,ptyxis-${BASE_VERSION}/," \
+        --exclude=.git --exclude=dist --exclude=build \
+        -cJf "/root/rpmbuild/SOURCES/ptyxis-${BASE_VERSION}.tar.xz" . && \
+    cp packaging/fedora/ptyxis.spec /root/rpmbuild/SPECS/ && \
+    rpmbuild -bb \
+        --define "snapshot_release ${RPM_RELEASE}" \
+        --define "snapshot_version ${BASE_VERSION}" \
+        /root/rpmbuild/SPECS/ptyxis.spec && \
+    mkdir -p /out && find /root/rpmbuild/RPMS -type f -name '*.rpm' -exec cp '{}' /out/ \;
+
+FROM scratch AS export-fedora
+COPY --from=fedora-build /out/ /
+
+FROM archlinux:latest AS arch-build
+ARG BASE_VERSION
+ARG ARCH_VERSION
+RUN pacman -Syu --noconfirm --needed \
+    appstream base-devel desktop-file-utils gettext glib2-devel gtk4 \
+    json-glib libadwaita libportal-gtk4 meson ninja pkgconf vte4 && \
+    pacman -Scc --noconfirm
+COPY . /src
+WORKDIR /src
+RUN useradd --create-home builder && \
+    mkdir -p /pkgbuild /out && \
+    tar --transform "s,^,ptyxis-${ARCH_VERSION}/," \
+        --exclude=.git --exclude=dist --exclude=build \
+        -cJf "/pkgbuild/ptyxis-${ARCH_VERSION}.tar.xz" . && \
+    sed \
+      -e "s/@PKGVER@/${ARCH_VERSION}/g" \
+      -e "s/@SOURCE_SHA256@/$(sha256sum "/pkgbuild/ptyxis-${ARCH_VERSION}.tar.xz" | cut -d' ' -f1)/g" \
+      packaging/arch/PKGBUILD.in > /pkgbuild/PKGBUILD && \
+    chown -R builder:builder /pkgbuild /out && \
+    su builder -c 'cd /pkgbuild && makepkg --cleanbuild --noconfirm' && \
+    test -x /pkgbuild/pkg/ptyxis/usr/bin/ptyxis && \
+    test -x /pkgbuild/pkg/ptyxis/usr/lib/ptyxis/ptyxis-agent -o \
+         -x /pkgbuild/pkg/ptyxis/usr/libexec/ptyxis-agent && \
+    find /pkgbuild -maxdepth 1 -type f -name '*.pkg.tar.*' -exec cp '{}' /out/ \;
+
+FROM scratch AS export-arch
+COPY --from=arch-build /out/ /

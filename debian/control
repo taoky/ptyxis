@@ -1,0 +1,34 @@
+Source: ptyxis
+Section: gnome
+Priority: optional
+Maintainer: Ptyxis snapshot builder <noreply@example.invalid>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-gnome,
+ desktop-file-utils,
+ gettext,
+ libadwaita-1-dev (>= 1.8),
+ libglib2.0-dev (>= 2.80),
+ libgtk-4-dev (>= 4.14),
+ libjson-glib-dev (>= 1.6),
+ libportal-gtk4-dev,
+ libvte-2.91-gtk4-dev (>= 0.79),
+ libxml2-utils,
+ meson (>= 1.0),
+ pkgconf
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Homepage: https://gitlab.gnome.org/GNOME/ptyxis
+
+Package: ptyxis
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Suggests:
+ distrobox,
+ podman
+Description: container-oriented terminal for GNOME
+ Ptyxis is a terminal emulator designed for GNOME. It provides first-class
+ support for containers through Podman, Toolbx, and Distrobox, along with
+ profiles, searchable tabs, and split terminal panes.

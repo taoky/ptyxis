@@ -1,0 +1,5 @@
+ptyxis (50.2-1) unstable; urgency=medium
+
+  * Package the current upstream release.
+
+ -- Ptyxis snapshot builder <noreply@example.invalid>  Fri, 21 Aug 2026 00:00:00 +0000

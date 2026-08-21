@@ -1,0 +1,32 @@
+pkgname=ptyxis
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc='Container-oriented terminal for GNOME'
+arch=(x86_64 aarch64)
+url='https://gitlab.gnome.org/GNOME/ptyxis'
+license=(GPL-2.0-or-later GPL-3.0-or-later LGPL-2.0-or-later LGPL-3.0-or-later CC0-1.0)
+depends=(glib2 gtk4 json-glib libadwaita libportal-gtk4 vte4)
+makedepends=(appstream desktop-file-utils gettext meson ninja pkgconf)
+optdepends=(
+  'distrobox: Distrobox container integration'
+  'podman: Podman and Toolbx container integration'
+)
+source=("ptyxis-${pkgver}.tar.xz")
+sha256sums=('@SOURCE_SHA256@')
+
+build() {
+  arch-meson "ptyxis-${pkgver}" build \
+    --buildtype=plain \
+    --wrap-mode=nodownload
+  meson compile -C build
+}
+
+check() {
+  meson test -C build --print-errorlogs
+}
+
+package() {
+  meson install -C build --destdir "$pkgdir"
+  install -Dm644 "ptyxis-${pkgver}/COPYING" \
+    "$pkgdir/usr/share/licenses/$pkgname/COPYING"
+}

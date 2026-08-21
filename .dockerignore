@@ -1,0 +1,8 @@
+.git
+.flatpak-builder
+build
+dist
+_build
+_flatpak-build
+_flatpak-repo
+PLAN.md

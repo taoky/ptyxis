@@ -1,0 +1,75 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Ptyxis
+Source: https://gitlab.gnome.org/GNOME/ptyxis
+
+Files: *
+Copyright: Ptyxis contributors
+License: GPL-3+
+
+Files: src/gdkhsla.c
+       src/gdkhslaprivate.h
+Copyright: 2012 Benjamin Otte
+License: LGPL-2+
+
+Files: src/ptyxis-action-group.h
+       src/ptyxis-theme-selector.c
+       src/ptyxis-theme-selector.h
+Copyright: 2017-2023 Christian Hergert
+License: LGPL-3+
+
+Files: src/ptyxis-shortcut-accel-dialog.c
+Copyright: 2016 Endless, Inc
+           2017 Christian Hergert
+License: GPL-2+
+
+Files: data/org.gnome.Ptyxis.metainfo.xml.in.in
+Copyright: Ptyxis contributors
+License: CC0-1.0
+
+Files: debian/*
+Copyright: 2026 Ptyxis snapshot builder
+License: GPL-3+
+
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
+
+License: LGPL-2+
+ This library is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as published
+ by the Free Software Foundation, either version 2 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU Lesser General Public
+ License version 2 can be found in /usr/share/common-licenses/LGPL-2.
+
+License: LGPL-3+
+ This library is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as published
+ by the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU Lesser General Public
+ License version 3 can be found in /usr/share/common-licenses/LGPL-3.
+
+License: GPL-2+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 2 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.
+
+License: CC0-1.0
+ To the extent possible under law, the authors have waived all copyright and
+ related or neighboring rights to this metadata under the Creative Commons
+ CC0 1.0 Universal dedication.
+ .
+ On Debian systems, the complete text of CC0 1.0 can be found in
+ /usr/share/common-licenses/CC0-1.0.

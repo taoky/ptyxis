@@ -1,0 +1,125 @@
+{
+  "app-id": "org.gnome.Ptyxis",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "50",
+  "sdk": "org.gnome.Sdk",
+  "command": "ptyxis",
+  "finish-args": [
+    "--allow=devel",
+    "--device=dri",
+    "--filesystem=host",
+    "--share=ipc",
+    "--share=network",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--talk-name=org.freedesktop.Flatpak"
+  ],
+  "cleanup": [
+    "/bin/vte-2.91-gtk4",
+    "/etc",
+    "/libexec/vte-urlencode-cwd",
+    "/include",
+    "/lib/cmake",
+    "/lib/pkgconfig",
+    "/man",
+    "/share/doc",
+    "/share/gir-1.0",
+    "/share/gtk-doc",
+    "/share/man",
+    "/share/pkgconfig",
+    "/share/vala",
+    "*.la",
+    "*.a"
+  ],
+  "modules": [
+    {
+      "name": "libportal",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "--buildtype=release",
+        "-Dbackend-gtk3=disabled",
+        "-Dbackend-gtk4=enabled",
+        "-Dbackend-qt5=disabled",
+        "-Dbackend-qt6=disabled",
+        "-Dportal-tests=false",
+        "-Ddocs=false",
+        "-Dtests=false"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/flatpak/libportal/releases/download/0.9.1/libportal-0.9.1.tar.xz",
+          "sha256": "de801ee349ed3c255a9af3c01b1a401fab5b3fc1c35eb2fd7dfb35d4b8194d7f"
+        }
+      ]
+    },
+    {
+      "name": "fast_float",
+      "buildsystem": "cmake-ninja",
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/fastfloat/fast_float.git",
+          "tag": "v8.2.5",
+          "commit": "05087a303dad9c98768b33c829d398223a649bc6"
+        }
+      ]
+    },
+    {
+      "name": "simdutf",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE",
+        "-DCMAKE_VISIBILITY_INLINES_HIDDEN=TRUE"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/simdutf/simdutf.git",
+          "tag": "v9.0.0",
+          "commit": "ca7acbcea967b5dcbab490066e99e3a6e6925539"
+        }
+      ]
+    },
+    {
+      "name": "vte",
+      "buildsystem": "meson",
+      "config-opts": [
+        "--buildtype=release",
+        "-Dapp=false",
+        "-Dgtk3=false",
+        "-Dgtk4=true",
+        "-Dglade=false",
+        "-Dgir=false",
+        "-Dvapi=false"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://download.gnome.org/sources/vte/0.84/vte-0.84.0.tar.xz",
+          "sha256": "0414e31583836aeb7878da25f67c515f7e8879917ecc37c92e26b83e8d8fc3e3"
+        }
+      ]
+    },
+    {
+      "name": "ptyxis",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "--buildtype=release",
+        "-Ddevelopment=false",
+        "-Dgeneric=ptyxis",
+        "-Dlibc-compat=true",
+        "-Dapp-id=org.gnome.Ptyxis"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../.."
+        }
+      ]
+    }
+  ]
+}
