@@ -127,6 +127,18 @@ ptyxis_window_save_size (PtyxisWindow *self)
 }
 
 static void
+ptyxis_window_maybe_reset_default_size (PtyxisWindow *self)
+{
+  PtyxisTab *active_tab;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+
+  active_tab = ptyxis_window_get_active_tab (self);
+  if (active_tab == NULL || ptyxis_tab_get_n_panes (active_tab) == 1)
+    gtk_window_set_default_size (GTK_WINDOW (self), -1, -1);
+}
+
+static void
 ptyxis_window_close_page_dialog_cb (GObject      *object,
                                     GAsyncResult *result,
                                     gpointer      user_data)
@@ -160,7 +172,7 @@ ptyxis_window_close_page_dialog_cb (GObject      *object,
 
   /* Resize if we are going from 2->1 tabs */
   if (adw_tab_view_get_n_pages (self->tab_view) == 1)
-    gtk_window_set_default_size (GTK_WINDOW (self), -1, -1);
+    ptyxis_window_maybe_reset_default_size (self);
 }
 
 static gboolean
@@ -189,7 +201,6 @@ ptyxis_window_close_page_cb (PtyxisWindow *self,
       !ptyxis_settings_get_prompt_on_close (settings))
     {
       ptyxis_parking_lot_push (self->parking_lot, tab);
-      gtk_window_set_default_size (GTK_WINDOW (self), -1, -1);
       return GDK_EVENT_PROPAGATE;
     }
 
@@ -401,7 +412,7 @@ update_visible_and_maybe_close (PtyxisWindow *self)
   if (visible != was_visible)
     {
       gtk_widget_set_visible (GTK_WIDGET (self->tab_bar), visible);
-      gtk_window_set_default_size (GTK_WINDOW (self), -1, -1);
+      ptyxis_window_maybe_reset_default_size (self);
 
       if (visible)
         gtk_widget_add_css_class (GTK_WIDGET (self), "has-tab-bar");
