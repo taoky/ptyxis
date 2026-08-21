@@ -1125,7 +1125,8 @@ ptyxis_tab_unroot (GtkWidget *widget)
   /* Clear inhibit cookie when widget is unrooted since the window
    * reference may no longer be valid.
    */
-  if (ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
+  if (self->pane != NULL &&
+      ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                  ptyxis_pane_get_inhibit_cookie (self->pane));
@@ -1159,20 +1160,23 @@ ptyxis_tab_dispose (GObject *object)
 
   ptyxis_tab_force_quit (self);
 
-  gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
-
-  while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
-    gtk_widget_unparent (child);
-
-  g_clear_object (&self->cached_texture);
-  if (ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
+  /* Template disposal clears self->pane, so release application state that
+   * is keyed by the pane before disposing template children.
+   */
+  if (self->pane != NULL &&
+      ptyxis_pane_get_inhibit_cookie (self->pane) != 0)
     {
       gtk_application_uninhibit (GTK_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                  ptyxis_pane_get_inhibit_cookie (self->pane));
       ptyxis_pane_set_inhibit_cookie (self->pane, 0);
     }
 
+  gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
 
+  while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
+    gtk_widget_unparent (child);
+
+  g_clear_object (&self->cached_texture);
   G_OBJECT_CLASS (ptyxis_tab_parent_class)->dispose (object);
 }
 
