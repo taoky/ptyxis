@@ -807,6 +807,30 @@
                 <property name="shortcut-name">split-vertical</property>
               </object>
             </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_focus_pane_left">
+                <property name="title" translatable="yes">Focus Pane to the Left</property>
+                <property name="shortcut-name">focus-pane-left</property>
+              </object>
+            </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_focus_pane_right">
+                <property name="title" translatable="yes">Focus Pane to the Right</property>
+                <property name="shortcut-name">focus-pane-right</property>
+              </object>
+            </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_focus_pane_up">
+                <property name="title" translatable="yes">Focus Pane Above</property>
+                <property name="shortcut-name">focus-pane-up</property>
+              </object>
+            </child>
+            <child>
+              <object class="PtyxisShortcutRow" id="shortcut_focus_pane_down">
+                <property name="title" translatable="yes">Focus Pane Below</property>
+                <property name="shortcut-name">focus-pane-down</property>
+              </object>
+            </child>
           </object>
         </child>
         <child>

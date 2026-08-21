@@ -137,6 +137,46 @@
             <property name="action">action(tab.split-vertical)</property>
           </object>
         </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="focus-pane-left" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.focus-pane-left)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="focus-pane-right" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.focus-pane-right)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="focus-pane-up" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.focus-pane-up)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
+              <lookup name="focus-pane-down" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisTerminal</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(tab.focus-pane-down)</property>
+          </object>
+        </child>
       </object>
     </child>
     <child>

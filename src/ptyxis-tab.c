@@ -24,6 +24,7 @@
 #include <glib/gi18n.h>
 
 #include <cairo.h>
+#include <math.h>
 
 #ifdef __linux__
 # include <libportal/portal.h>
@@ -150,6 +151,68 @@ ptyxis_tab_focus_relative_action (GtkWidget  *widget,
 
       ptyxis_tab_set_active_pane (self, pane);
       gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (pane)));
+    }
+}
+
+static void
+ptyxis_tab_focus_direction_action (GtkWidget  *widget,
+                                   const char *action_name,
+                                   GVariant   *params)
+{
+  PtyxisTab *self = PTYXIS_TAB (widget);
+  graphene_rect_t active_bounds;
+  PtyxisPane *best_pane = NULL;
+  double best_score = G_MAXDOUBLE;
+  double active_x;
+  double active_y;
+  guint n_panes;
+
+  if (!gtk_widget_compute_bounds (GTK_WIDGET (self->active_pane),
+                                  GTK_WIDGET (self),
+                                  &active_bounds))
+    return;
+
+  active_x = active_bounds.origin.x + active_bounds.size.width / 2.;
+  active_y = active_bounds.origin.y + active_bounds.size.height / 2.;
+  n_panes = ptyxis_split_node_count_leaves (self->split_root);
+
+  for (guint i = 0; i < n_panes; i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+      graphene_rect_t bounds;
+      double primary;
+      double secondary;
+      double x;
+      double y;
+
+      if (pane == self->active_pane ||
+          !gtk_widget_compute_bounds (GTK_WIDGET (pane), GTK_WIDGET (self), &bounds))
+        continue;
+
+      x = bounds.origin.x + bounds.size.width / 2.;
+      y = bounds.origin.y + bounds.size.height / 2.;
+
+      if (g_str_equal (action_name, "tab.focus-pane-left"))
+        primary = active_x - x, secondary = fabs (active_y - y);
+      else if (g_str_equal (action_name, "tab.focus-pane-right"))
+        primary = x - active_x, secondary = fabs (active_y - y);
+      else if (g_str_equal (action_name, "tab.focus-pane-up"))
+        primary = active_y - y, secondary = fabs (active_x - x);
+      else
+        primary = y - active_y, secondary = fabs (active_x - x);
+
+      if (primary > 0 && primary + secondary * 2 < best_score)
+        {
+          best_score = primary + secondary * 2;
+          best_pane = pane;
+        }
+    }
+
+  if (best_pane != NULL)
+    {
+      ptyxis_tab_set_active_pane (self, best_pane);
+      gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (best_pane)));
     }
 }
 
@@ -1810,6 +1873,14 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
                                    ptyxis_tab_focus_relative_action);
   gtk_widget_class_install_action (widget_class, "tab.focus-pane-previous", NULL,
                                    ptyxis_tab_focus_relative_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-left", NULL,
+                                   ptyxis_tab_focus_direction_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-right", NULL,
+                                   ptyxis_tab_focus_direction_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-up", NULL,
+                                   ptyxis_tab_focus_direction_action);
+  gtk_widget_class_install_action (widget_class, "tab.focus-pane-down", NULL,
+                                   ptyxis_tab_focus_direction_action);
   gtk_widget_class_install_action (widget_class, "tab.split-horizontal", NULL,
                                    ptyxis_tab_split_action);
   gtk_widget_class_install_action (widget_class, "tab.split-vertical", NULL,

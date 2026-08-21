@@ -449,6 +449,30 @@
       <description>The shortcut to split the active pane vertically</description>
     </key>
 
+    <key name="focus-pane-left" type="s">
+      <default>'&lt;alt&gt;Left'</default>
+      <summary>Focus Pane to the Left</summary>
+      <description>The shortcut to focus the pane to the left</description>
+    </key>
+
+    <key name="focus-pane-right" type="s">
+      <default>'&lt;alt&gt;Right'</default>
+      <summary>Focus Pane to the Right</summary>
+      <description>The shortcut to focus the pane to the right</description>
+    </key>
+
+    <key name="focus-pane-up" type="s">
+      <default>'&lt;alt&gt;Up'</default>
+      <summary>Focus Pane Above</summary>
+      <description>The shortcut to focus the pane above</description>
+    </key>
+
+    <key name="focus-pane-down" type="s">
+      <default>'&lt;alt&gt;Down'</default>
+      <summary>Focus Pane Below</summary>
+      <description>The shortcut to focus the pane below</description>
+    </key>
+
     <key name="tab-overview" type="s">
       <default>'&lt;ctrl&gt;&lt;shift&gt;o'</default>
       <summary>Tab Overview</summary>

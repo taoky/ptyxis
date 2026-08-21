@@ -106,6 +106,10 @@ struct _PtyxisPreferencesWindow
   PtyxisShortcutRow    *shortcut_focus_tab_8;
   PtyxisShortcutRow    *shortcut_focus_tab_9;
   PtyxisShortcutRow    *shortcut_focus_tab_last;
+  PtyxisShortcutRow    *shortcut_focus_pane_down;
+  PtyxisShortcutRow    *shortcut_focus_pane_left;
+  PtyxisShortcutRow    *shortcut_focus_pane_right;
+  PtyxisShortcutRow    *shortcut_focus_pane_up;
   PtyxisShortcutRow    *shortcut_move_next_tab;
   PtyxisShortcutRow    *shortcut_move_previous_tab;
   PtyxisShortcutRow    *shortcut_move_tab_left;
@@ -945,6 +949,18 @@ ptyxis_preferences_window_constructed (GObject *object)
   g_object_bind_property (shortcuts, "split-vertical",
                           self->shortcut_split_vertical, "accelerator",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "focus-pane-left",
+                          self->shortcut_focus_pane_left, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "focus-pane-right",
+                          self->shortcut_focus_pane_right, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "focus-pane-up",
+                          self->shortcut_focus_pane_up, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (shortcuts, "focus-pane-down",
+                          self->shortcut_focus_pane_down, "accelerator",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
   g_object_bind_property (shortcuts, "tab-overview",
                           self->shortcut_tab_overview, "accelerator",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
@@ -1206,6 +1222,10 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_tab_8);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_tab_9);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_tab_last);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_pane_down);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_pane_left);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_pane_right);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_focus_pane_up);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_move_next_tab);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_move_previous_tab);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, shortcut_move_tab_left);
