@@ -83,6 +83,18 @@ void        ptyxis_pane_set_initial_title (PtyxisPane *self,
 const char *ptyxis_pane_get_title_prefix  (PtyxisPane *self);
 void        ptyxis_pane_set_title_prefix  (PtyxisPane *self,
                                            const char *prefix);
+GPid        ptyxis_pane_get_foreground_pid (PtyxisPane *self);
+void        ptyxis_pane_set_foreground_pid (PtyxisPane *self,
+                                            GPid         pid);
+gboolean    ptyxis_pane_get_has_foreground_process (PtyxisPane *self);
+void        ptyxis_pane_set_has_foreground_process (PtyxisPane *self,
+                                                     gboolean    has_foreground_process);
+const char *ptyxis_pane_get_command_line (PtyxisPane *self);
+void        ptyxis_pane_set_command_line (PtyxisPane *self,
+                                          const char *command_line);
+const char *ptyxis_pane_get_program_name (PtyxisPane *self);
+void        ptyxis_pane_set_program_name (PtyxisPane *self,
+                                          const char *program_name);
 void            ptyxis_pane_set_terminal (PtyxisPane     *self,
                                            PtyxisTerminal *terminal);
 

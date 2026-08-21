@@ -60,18 +60,14 @@ struct _PtyxisTab
   PtyxisPane              *pane;
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
-  char                    *command_line;
-  char                    *program_name;
   PtyxisTabNotify          notify;
   GSignalGroup            *profile_signals;
 
   PtyxisTabState           state;
-  GPid                     pid;
 
   gint64                   respawn_time;
 
   PtyxisProcessLeaderKind  leader_kind : 3;
-  guint                    has_foreground_process : 1;
   guint                    forced_exit : 1;
   guint                    ignore_osc_title : 1;
   guint                    ignore_snapshot : 1;
@@ -322,9 +318,9 @@ ptyxis_tab_update_inhibit (PtyxisTab *self)
     }
 
   /* Only inhibit if there's a foreground process running and it's not a shell */
-  if (self->has_foreground_process &&
-      self->program_name != NULL &&
-      !ptyxis_is_shell (self->program_name))
+  if (ptyxis_pane_get_has_foreground_process (self->pane) &&
+      ptyxis_pane_get_program_name (self->pane) != NULL &&
+      !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane)))
     inhibit = TRUE;
 
   /* Check if we need to change the inhibit state */
@@ -1196,8 +1192,6 @@ ptyxis_tab_dispose (GObject *object)
       self->inhibit_cookie = 0;
     }
 
-  g_clear_pointer (&self->command_line, g_free);
-  g_clear_pointer (&self->program_name, g_free);
 
   G_OBJECT_CLASS (ptyxis_tab_parent_class)->dispose (object);
 }
@@ -1217,7 +1211,7 @@ ptyxis_tab_get_property (GObject    *object,
       break;
 
     case PROP_COMMAND_LINE:
-      g_value_set_string (value, self->command_line);
+      g_value_set_string (value, ptyxis_pane_get_command_line (self->pane));
       break;
 
     case PROP_ICON:
@@ -1654,11 +1648,11 @@ ptyxis_tab_dup_title (PtyxisTab *self)
     g_string_append_printf (gstr, " (%s)", _("Exited"));
   else if (self->state == PTYXIS_TAB_STATE_FAILED)
     g_string_append_printf (gstr, " (%s)", _("Failed"));
-  else if (self->has_foreground_process &&
-           !ptyxis_str_empty0 (self->command_line) &&
-           !ptyxis_str_empty0 (self->program_name) &&
-           !ptyxis_is_shell (self->program_name))
-    g_string_append_printf (gstr, " — %s", self->command_line);
+  else if (ptyxis_pane_get_has_foreground_process (self->pane) &&
+           !ptyxis_str_empty0 (ptyxis_pane_get_command_line (self->pane)) &&
+           !ptyxis_str_empty0 (ptyxis_pane_get_program_name (self->pane)) &&
+           !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane)))
+    g_string_append_printf (gstr, " — %s", ptyxis_pane_get_command_line (self->pane));
 
   return g_string_free (gstr, FALSE);
 }
@@ -1870,10 +1864,10 @@ ptyxis_tab_is_running (PtyxisTab  *self,
   ptyxis_tab_poll_agent (self);
 
   if (cmdline != NULL)
-    *cmdline = g_strdup (self->command_line);
+    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->pane));
 
-  if (self->has_foreground_process && self->program_name != NULL)
-    return !ptyxis_is_shell (self->program_name);
+  if (ptyxis_pane_get_has_foreground_process (self->pane) && ptyxis_pane_get_program_name (self->pane) != NULL)
+    return !ptyxis_is_shell (ptyxis_pane_get_program_name (self->pane));
 
   return FALSE;
 }
@@ -2032,17 +2026,17 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
                                                          result,
                                                          NULL);
 
-  if (self->pid != the_pid)
+  if (ptyxis_pane_get_foreground_pid (self->pane) != the_pid)
     {
       changed = TRUE;
-      self->pid = the_pid;
+      ptyxis_pane_set_foreground_pid (self->pane, the_pid);
     }
 
-  if (self->has_foreground_process != has_foreground_process)
+  if (ptyxis_pane_get_has_foreground_process (self->pane) != has_foreground_process)
     {
       changed = TRUE;
       inhibit_changed = TRUE;
-      self->has_foreground_process = has_foreground_process;
+      ptyxis_pane_set_has_foreground_process (self->pane, has_foreground_process);
     }
 
   if (g_strcmp0 (the_leader_kind, "superuser") == 0)
@@ -2065,18 +2059,22 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
     }
 
-  if (g_set_str (&self->command_line, the_cmdline))
+  if (g_strcmp0 (ptyxis_pane_get_command_line (self->pane), the_cmdline) != 0)
     {
       g_autofree char *program_name = NULL;
       const char *space;
 
       changed = TRUE;
+      ptyxis_pane_set_command_line (self->pane, the_cmdline);
 
       if (the_cmdline != NULL && (space = strchr (the_cmdline, ' ')))
         program_name = g_strndup (the_cmdline, space - the_cmdline);
 
-      if (g_set_str (&self->program_name, program_name))
-        inhibit_changed = TRUE;
+      if (g_strcmp0 (ptyxis_pane_get_program_name (self->pane), program_name) != 0)
+        {
+          ptyxis_pane_set_program_name (self->pane, program_name);
+          inhibit_changed = TRUE;
+        }
 
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
     }
@@ -2109,11 +2107,14 @@ ptyxis_tab_poll_agent_async (PtyxisTab           *self,
 
   if (ptyxis_tab_get_process (self) == NULL)
     {
-      self->has_foreground_process = FALSE;
-      self->pid = -1;
+      ptyxis_pane_set_has_foreground_process (self->pane, FALSE);
+      ptyxis_pane_set_foreground_pid (self->pane, -1);
 
-      if (g_set_str (&self->command_line, NULL))
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
+      if (ptyxis_pane_get_command_line (self->pane) != NULL)
+        {
+          ptyxis_pane_set_command_line (self->pane, NULL);
+          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
+        }
 
       if (self->leader_kind != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
         {
@@ -2162,12 +2163,12 @@ ptyxis_tab_has_foreground_process (PtyxisTab  *self,
   ptyxis_tab_poll_agent (self);
 
   if (pid != NULL)
-    *pid = self->pid;
+    *pid = ptyxis_pane_get_foreground_pid (self->pane);
 
   if (cmdline != NULL)
-    *cmdline = g_strdup (self->command_line);
+    *cmdline = g_strdup (ptyxis_pane_get_command_line (self->pane));
 
-  return self->has_foreground_process;
+  return ptyxis_pane_get_has_foreground_process (self->pane);
 }
 
 void
@@ -2204,7 +2205,7 @@ ptyxis_tab_get_command_line (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->command_line;
+  return ptyxis_pane_get_command_line (self->pane);
 }
 
 #ifdef __linux__

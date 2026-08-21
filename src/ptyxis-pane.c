@@ -21,6 +21,10 @@ struct _PtyxisPane
   PtyxisIpcContainer *container;
   char *initial_title;
   char *title_prefix;
+  char *command_line;
+  char *program_name;
+  GPid foreground_pid;
+  guint has_foreground_process : 1;
 };
 
 enum {
@@ -52,6 +56,8 @@ ptyxis_pane_dispose (GObject *object)
   g_clear_pointer (&self->previous_working_directory_uri, g_free);
   g_clear_pointer (&self->initial_title, g_free);
   g_clear_pointer (&self->title_prefix, g_free);
+  g_clear_pointer (&self->command_line, g_free);
+  g_clear_pointer (&self->program_name, g_free);
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
 
@@ -166,6 +172,7 @@ ptyxis_pane_init (PtyxisPane *self)
 {
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
+  self->foreground_pid = -1;
 }
 
 PtyxisZoomLevel
@@ -323,6 +330,66 @@ ptyxis_pane_set_title_prefix (PtyxisPane *self,
 {
   g_return_if_fail (PTYXIS_IS_PANE (self));
   g_set_str (&self->title_prefix, prefix);
+}
+
+GPid
+ptyxis_pane_get_foreground_pid (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), -1);
+  return self->foreground_pid;
+}
+
+void
+ptyxis_pane_set_foreground_pid (PtyxisPane *self,
+                                GPid         pid)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  self->foreground_pid = pid;
+}
+
+gboolean
+ptyxis_pane_get_has_foreground_process (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), FALSE);
+  return self->has_foreground_process;
+}
+
+void
+ptyxis_pane_set_has_foreground_process (PtyxisPane *self,
+                                        gboolean    has_foreground_process)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  self->has_foreground_process = !!has_foreground_process;
+}
+
+const char *
+ptyxis_pane_get_command_line (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->command_line;
+}
+
+void
+ptyxis_pane_set_command_line (PtyxisPane *self,
+                              const char *command_line)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->command_line, command_line);
+}
+
+const char *
+ptyxis_pane_get_program_name (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->program_name;
+}
+
+void
+ptyxis_pane_set_program_name (PtyxisPane *self,
+                              const char *program_name)
+{
+  g_return_if_fail (PTYXIS_IS_PANE (self));
+  g_set_str (&self->program_name, program_name);
 }
 
 PtyxisPane *
