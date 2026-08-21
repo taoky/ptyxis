@@ -24,6 +24,7 @@
 #include <gtk/gtk.h>
 
 #include "ptyxis-agent-ipc.h"
+#include "ptyxis-pane.h"
 #include "ptyxis-profile.h"
 #include "ptyxis-terminal.h"
 
@@ -84,6 +85,7 @@ typedef enum _PtyxisTabProgress
 G_DECLARE_FINAL_TYPE (PtyxisTab, ptyxis_tab, PTYXIS, TAB, GtkWidget)
 
 PtyxisTab          *ptyxis_tab_new                                (PtyxisProfile        *profile);
+PtyxisPane         *ptyxis_tab_get_active_pane                    (PtyxisTab            *self);
 PtyxisTerminal     *ptyxis_tab_get_terminal                       (PtyxisTab            *self);
 PtyxisProfile      *ptyxis_tab_get_profile                        (PtyxisTab            *self);
 void                ptyxis_tab_apply_profile                      (PtyxisTab            *self,

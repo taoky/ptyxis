@@ -25,26 +25,28 @@
       </object>
     </child>
     <child>
-      <object class="GtkBox">
-        <property name="orientation">vertical</property>
+      <object class="PtyxisPane" id="pane">
         <child>
-          <object class="AdwBanner" id="banner">
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <child>
+              <object class="AdwBanner" id="banner">
             <!--
               We don't allow animations because it makes the terminal
               grid resize in a janky fashion.
             -->
             <property name="revealed">true</property>
             <property name="visible">false</property>
-          </object>
-        </child>
-        <child>
-          <object class="GtkScrolledWindow" id="scrolled_window">
+              </object>
+            </child>
+            <child>
+              <object class="GtkScrolledWindow" id="scrolled_window">
             <property name="propagate-natural-width">true</property>
             <property name="propagate-natural-height">true</property>
             <property name="hscrollbar-policy">never</property>
             <property name="vexpand">true</property>
-            <child>
-              <object class="PtyxisTerminal" id="terminal">
+                <child>
+                  <object class="PtyxisTerminal" id="terminal">
                 <property name="enable-fallback-scrolling">false</property>
                 <property name="scroll-unit-is-pixels">true</property>
                 <signal name="commit" handler="ptyxis_tab_commit_cb" swapped="1"/>
@@ -95,6 +97,8 @@
                     <lookup name="profile">PtyxisTab</lookup>
                   </lookup>
                 </binding>
+                  </object>
+                </child>
               </object>
             </child>
           </object>

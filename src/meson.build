@@ -18,6 +18,7 @@ ptyxis_sources = [
   'ptyxis-palette-preview.c',
   'ptyxis-palette-preview-color.c',
   'ptyxis-parking-lot.c',
+  'ptyxis-pane.c',
   'ptyxis-preferences-list-item.c',
   'ptyxis-preferences-window.c',
   'ptyxis-profile-editor.c',

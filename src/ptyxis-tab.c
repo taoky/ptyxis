@@ -34,6 +34,7 @@
 #include "ptyxis-application.h"
 #include "ptyxis-enums.h"
 #include "ptyxis-inspector.h"
+#include "ptyxis-pane.h"
 #include "ptyxis-tab-monitor.h"
 #include "ptyxis-tab-notify.h"
 #include "ptyxis-tab-private.h"
@@ -66,6 +67,7 @@ struct _PtyxisTab
   char                    *initial_title;
   GdkTexture              *cached_texture;
   AdwBanner               *banner;
+  PtyxisPane              *pane;
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
   char                    *command_line;
@@ -90,6 +92,7 @@ struct _PtyxisTab
 
 enum {
   PROP_0,
+  PROP_ACTIVE_PANE,
   PROP_COMMAND_LINE,
   PROP_ICON,
   PROP_IGNORE_OSC_TITLE,
@@ -1233,6 +1236,10 @@ ptyxis_tab_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_ACTIVE_PANE:
+      g_value_set_object (value, self->pane);
+      break;
+
     case PROP_COMMAND_LINE:
       g_value_set_string (value, self->command_line);
       break;
@@ -1350,6 +1357,12 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
   widget_class->size_allocate = ptyxis_tab_size_allocate;
   widget_class->root = ptyxis_tab_root;
   widget_class->unroot = ptyxis_tab_unroot;
+
+  properties[PROP_ACTIVE_PANE] =
+    g_param_spec_object ("active-pane", NULL, NULL,
+                         PTYXIS_TYPE_PANE,
+                         (G_PARAM_READABLE |
+                          G_PARAM_STATIC_STRINGS));
 
   properties[PROP_COMMAND_LINE] =
     g_param_spec_string ("command-line", NULL, NULL,
@@ -1476,6 +1489,7 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
   gtk_widget_class_set_css_name (widget_class, "ptyxistab");
 
   gtk_widget_class_bind_template_child (widget_class, PtyxisTab, banner);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisTab, pane);
   gtk_widget_class_bind_template_child (widget_class, PtyxisTab, terminal);
   gtk_widget_class_bind_template_child (widget_class, PtyxisTab, scrolled_window);
 
@@ -1495,6 +1509,7 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
   gtk_widget_class_install_action (widget_class, "tab.inspect", NULL, ptyxis_tab_inspect_action);
 
   g_type_ensure (PTYXIS_TYPE_TERMINAL);
+  g_type_ensure (PTYXIS_TYPE_PANE);
 }
 
 static void
@@ -1507,6 +1522,8 @@ ptyxis_tab_init (PtyxisTab *self)
   self->uuid = g_uuid_string_random ();
 
   gtk_widget_init_template (GTK_WIDGET (self));
+
+  ptyxis_pane_set_terminal (self->pane, self->terminal);
 
   ptyxis_tab_notify_init (&self->notify, self);
 
@@ -1544,6 +1561,13 @@ ptyxis_tab_new (PtyxisProfile *profile)
   return g_object_new (PTYXIS_TYPE_TAB,
                        "profile", profile,
                        NULL);
+}
+
+PtyxisPane *
+ptyxis_tab_get_active_pane (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+  return self->pane;
 }
 
 /**
@@ -1787,7 +1811,7 @@ ptyxis_tab_get_terminal (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return self->terminal;
+  return ptyxis_pane_get_terminal (self->pane);
 }
 
 void
