@@ -75,6 +75,7 @@ enum {
   PROP_PROGRESS,
   PROP_PROGRESS_FRACTION,
   PROP_READ_ONLY,
+  PROP_SEARCH_TEXT,
   PROP_SUBTITLE,
   PROP_TITLE,
   PROP_TITLE_PREFIX,
@@ -157,6 +158,14 @@ static void ptyxis_tab_increase_font_size_cb (PtyxisTab *, PtyxisTerminal *);
 static void ptyxis_tab_bell_cb (PtyxisTab *, PtyxisTerminal *);
 static void ptyxis_tab_invalidate_icon (PtyxisTab *);
 static void ptyxis_tab_invalidate_progress (PtyxisTab *);
+
+static void
+ptyxis_tab_invalidate_search_text (PtyxisTab *self)
+{
+  g_assert (PTYXIS_IS_TAB (self));
+
+  g_object_notify (G_OBJECT (self), "search-text");
+}
 static gboolean ptyxis_tab_match_clicked_cb (PtyxisTab *, double, double, int,
                                              GdkModifierType, const char *, PtyxisTerminal *);
 
@@ -684,6 +693,7 @@ ptyxis_tab_wait_cb (GObject      *object,
     ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_EXITED);
   else
     ptyxis_pane_set_state (pane, PTYXIS_PANE_STATE_FAILED);
+  ptyxis_tab_invalidate_search_text (self);
 
   if (ptyxis_pane_get_forced_exit (pane))
     return;
@@ -908,6 +918,7 @@ ptyxis_tab_respawn_pane (PtyxisTab  *self,
                                   ptyxis_tab_pane_call_new (self, pane));
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+  ptyxis_tab_invalidate_search_text (self);
 }
 
 static void
@@ -1032,6 +1043,7 @@ ptyxis_tab_split_pane (PtyxisTab            *self,
   gtk_widget_add_tick_callback (paned, ptyxis_tab_apply_split_ratio_cb, leaf, NULL);
   ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_update_pane_accessibility (self);
+  ptyxis_tab_invalidate_search_text (self);
 
   return g_steal_pointer (&new_pane);
 }
@@ -1132,6 +1144,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
   ptyxis_split_node_remove (leaf);
   ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_update_pane_accessibility (self);
+  ptyxis_tab_invalidate_search_text (self);
 }
 
 static void
@@ -1241,6 +1254,8 @@ ptyxis_tab_notify_window_title_cb (PtyxisTab      *self,
 
   if (terminal == self->terminal)
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+
+  ptyxis_tab_invalidate_search_text (self);
 }
 
 static void
@@ -1773,6 +1788,10 @@ ptyxis_tab_get_property (GObject    *object,
       g_value_set_boolean (value, ptyxis_pane_get_read_only (self->active_pane));
       break;
 
+    case PROP_SEARCH_TEXT:
+      g_value_take_string (value, ptyxis_tab_dup_search_text (self));
+      break;
+
     case PROP_SUBTITLE:
       g_value_take_string (value, ptyxis_tab_dup_subtitle (self));
       break;
@@ -1920,6 +1939,12 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
 
   properties[PROP_SUBTITLE] =
     g_param_spec_string ("subtitle", NULL, NULL,
+                         NULL,
+                         (G_PARAM_READABLE |
+                          G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_SEARCH_TEXT] =
+    g_param_spec_string ("search-text", NULL, NULL,
                          NULL,
                          (G_PARAM_READABLE |
                           G_PARAM_STATIC_STRINGS));
@@ -2376,6 +2401,8 @@ ptyxis_tab_restore_layout (PtyxisTab  *self,
   if (state.active_pane != NULL)
     ptyxis_tab_set_active_pane (self, state.active_pane);
 
+  ptyxis_tab_invalidate_search_text (self);
+
   return TRUE;
 }
 
@@ -2454,19 +2481,18 @@ ptyxis_tab_set_title_prefix (PtyxisTab  *self,
       ptyxis_pane_set_title_prefix (self->active_pane, title_prefix);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE_PREFIX]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+      ptyxis_tab_invalidate_search_text (self);
     }
 }
 
-char *
-ptyxis_tab_dup_title (PtyxisTab *self)
+static char *
+ptyxis_tab_dup_pane_title (PtyxisPane *pane)
 {
   GString *gstr;
-  PtyxisPane *pane;
   PtyxisTerminal *terminal;
 
-  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+  g_return_val_if_fail (PTYXIS_IS_PANE (pane), NULL);
 
-  pane = self->active_pane;
   terminal = ptyxis_pane_get_terminal (pane);
   gstr = g_string_new (ptyxis_pane_get_title_prefix (pane));
 
@@ -2501,6 +2527,39 @@ ptyxis_tab_dup_title (PtyxisTab *self)
     g_string_append_printf (gstr, " — %s", ptyxis_pane_get_command_line (pane));
 
   return g_string_free (gstr, FALSE);
+}
+
+char *
+ptyxis_tab_dup_title (PtyxisTab *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  return ptyxis_tab_dup_pane_title (self->active_pane);
+}
+
+char *
+ptyxis_tab_dup_search_text (PtyxisTab *self)
+{
+  g_autoptr(GString) search_text = NULL;
+  guint n_panes;
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  search_text = g_string_new (NULL);
+  n_panes = ptyxis_split_node_count_leaves (self->split_root);
+
+  for (guint i = 0; i < n_panes; i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+      g_autofree char *title = ptyxis_tab_dup_pane_title (pane);
+
+      if (search_text->len > 0)
+        g_string_append_c (search_text, ' ');
+      g_string_append (search_text, title);
+    }
+
+  return g_string_free (g_steal_pointer (&search_text), FALSE);
 }
 
 static char *
@@ -2988,8 +3047,12 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
     }
 
-  if (changed && pane == self->active_pane)
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+  if (changed)
+    {
+      if (pane == self->active_pane)
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+      ptyxis_tab_invalidate_search_text (self);
+    }
 
   if (inhibit_changed)
     ptyxis_tab_update_inhibit (self);
@@ -3109,6 +3172,7 @@ ptyxis_tab_set_command (PtyxisTab          *self,
     command = NULL;
 
   ptyxis_pane_set_command (self->active_pane, command);
+  ptyxis_tab_invalidate_search_text (self);
 }
 
 const char *
@@ -3126,6 +3190,7 @@ ptyxis_tab_set_initial_title (PtyxisTab  *self,
   g_return_if_fail (PTYXIS_IS_TAB (self));
 
   ptyxis_pane_set_initial_title (self->active_pane, initial_title);
+  ptyxis_tab_invalidate_search_text (self);
 }
 
 const char *
@@ -3465,6 +3530,7 @@ ptyxis_tab_set_ignore_osc_title (PtyxisTab *self,
       ptyxis_pane_set_ignore_osc_title (self->active_pane, ignore_osc_title);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+      ptyxis_tab_invalidate_search_text (self);
     }
 }
 
