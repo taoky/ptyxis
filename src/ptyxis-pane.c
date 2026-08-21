@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "config.h"
+#include <adwaita.h>
 #include "ptyxis-enums.h"
 #include "ptyxis-pane.h"
 #include "ptyxis-tab-monitor.h"
@@ -14,6 +15,9 @@ struct _PtyxisPane
   PtyxisIpcProcess *process;
   PtyxisTabMonitor *monitor;
   PtyxisTerminal *terminal;
+  GtkWidget *banner;
+  GtkScrolledWindow *scrolled_window;
+  GBindingGroup *terminal_bindings;
   PtyxisZoomLevel zoom;
   char *uuid;
   char **command;
@@ -79,8 +83,11 @@ ptyxis_pane_dispose (GObject *object)
   GtkWidget *child;
 
   self->terminal = NULL;
+  self->banner = NULL;
+  self->scrolled_window = NULL;
   g_clear_object (&self->profile);
   g_clear_object (&self->profile_signals);
+  g_clear_object (&self->terminal_bindings);
   g_clear_object (&self->process);
   g_clear_object (&self->monitor);
   g_clear_object (&self->container);
@@ -268,12 +275,49 @@ static void
 ptyxis_pane_init (PtyxisPane *self)
 {
   GtkEventController *focus;
+  GtkWidget *box;
 
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
   self->foreground_pid = -1;
   self->state = PTYXIS_PANE_STATE_INITIAL;
   self->profile_signals = g_signal_group_new (PTYXIS_TYPE_PROFILE);
+  self->terminal_bindings = g_binding_group_new ();
+
+  box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+  self->banner = g_object_new (ADW_TYPE_BANNER,
+                               "revealed", TRUE,
+                               "visible", FALSE,
+                               NULL);
+  self->scrolled_window = g_object_new (GTK_TYPE_SCROLLED_WINDOW,
+                                        "propagate-natural-width", TRUE,
+                                        "propagate-natural-height", TRUE,
+                                        "hscrollbar-policy", GTK_POLICY_NEVER,
+                                        "vexpand", TRUE,
+                                        NULL);
+  self->terminal = g_object_new (PTYXIS_TYPE_TERMINAL,
+                                 "enable-fallback-scrolling", FALSE,
+                                 "scroll-unit-is-pixels", TRUE,
+                                 NULL);
+  gtk_scrolled_window_set_child (self->scrolled_window, GTK_WIDGET (self->terminal));
+  gtk_box_append (GTK_BOX (box), self->banner);
+  gtk_box_append (GTK_BOX (box), GTK_WIDGET (self->scrolled_window));
+  gtk_widget_set_parent (box, GTK_WIDGET (self));
+
+  g_binding_group_bind (self->terminal_bindings, "palette",
+                        self->terminal, "palette", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "scroll-on-keystroke",
+                        self->terminal, "scroll-on-keystroke", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "scroll-on-output",
+                        self->terminal, "scroll-on-output", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "backspace-binding",
+                        self->terminal, "backspace-binding", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "delete-binding",
+                        self->terminal, "delete-binding", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "cjk-ambiguous-width",
+                        self->terminal, "cjk-ambiguous-width", G_BINDING_SYNC_CREATE);
+  g_binding_group_bind (self->terminal_bindings, "bold-is-bright",
+                        self->terminal, "bold-is-bright", G_BINDING_SYNC_CREATE);
 
   focus = gtk_event_controller_focus_new ();
   g_signal_connect_object (focus,
@@ -651,6 +695,20 @@ ptyxis_pane_get_terminal (PtyxisPane *self)
   return self->terminal;
 }
 
+GtkWidget *
+ptyxis_pane_get_banner (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->banner;
+}
+
+GtkScrolledWindow *
+ptyxis_pane_get_scrolled_window (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
+  return self->scrolled_window;
+}
+
 PtyxisProfile *
 ptyxis_pane_get_profile (PtyxisPane *self)
 {
@@ -666,15 +724,8 @@ ptyxis_pane_set_profile (PtyxisPane    *self,
   g_return_if_fail (profile == NULL || PTYXIS_IS_PROFILE (profile));
 
   if (g_set_object (&self->profile, profile))
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
-}
-
-void
-ptyxis_pane_set_terminal (PtyxisPane     *self,
-                          PtyxisTerminal *terminal)
-{
-  g_return_if_fail (PTYXIS_IS_PANE (self));
-  g_return_if_fail (PTYXIS_IS_TERMINAL (terminal));
-  g_return_if_fail (self->terminal == NULL || self->terminal == terminal);
-  self->terminal = terminal;
+    {
+      g_binding_group_set_source (self->terminal_bindings, profile);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
+    }
 }

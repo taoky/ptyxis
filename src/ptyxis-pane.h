@@ -69,6 +69,8 @@ G_DECLARE_FINAL_TYPE (PtyxisPane, ptyxis_pane, PTYXIS, PANE, GtkWidget)
 
 PtyxisPane     *ptyxis_pane_new          (void);
 PtyxisTerminal *ptyxis_pane_get_terminal (PtyxisPane     *self);
+GtkWidget      *ptyxis_pane_get_banner   (PtyxisPane     *self);
+GtkScrolledWindow *ptyxis_pane_get_scrolled_window (PtyxisPane *self);
 PtyxisProfile  *ptyxis_pane_get_profile  (PtyxisPane     *self);
 void            ptyxis_pane_set_profile  (PtyxisPane     *self,
                                            PtyxisProfile  *profile);
@@ -134,7 +136,5 @@ GSignalGroup   *ptyxis_pane_get_profile_signals (PtyxisPane *self);
 guint           ptyxis_pane_get_inhibit_cookie  (PtyxisPane *self);
 void            ptyxis_pane_set_inhibit_cookie  (PtyxisPane *self,
                                                   guint       inhibit_cookie);
-void            ptyxis_pane_set_terminal (PtyxisPane     *self,
-                                           PtyxisTerminal *terminal);
 
 G_END_DECLS
