@@ -1581,8 +1581,25 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
 
   if (self->active_pane != pane)
     {
+      g_object_freeze_notify (G_OBJECT (self));
       self->active_pane = pane;
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ACTIVE_PANE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_COMMAND_LINE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_IGNORE_OSC_TITLE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_INDICATOR_ICON]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROGRESS]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROGRESS_FRACTION]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_READ_ONLY]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SUBTITLE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TITLE_PREFIX]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_UUID]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM]);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ZOOM_LABEL]);
+      g_object_thaw_notify (G_OBJECT (self));
     }
 }
 
