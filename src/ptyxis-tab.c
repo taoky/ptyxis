@@ -881,6 +881,10 @@ ptyxis_tab_apply_split_ratio_cb (GtkWidget     *widget,
 
   gtk_paned_set_position (GTK_PANED (widget),
                           round (extent * ptyxis_split_node_get_ratio (node)));
+  g_signal_connect (widget,
+                    "notify::position",
+                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
+                    node);
   return G_SOURCE_REMOVE;
 }
 
@@ -934,10 +938,6 @@ ptyxis_tab_split_pane (PtyxisTab            *self,
   g_object_unref (source);
 
   ptyxis_split_node_split (leaf, direction, ratio, G_OBJECT (new_pane));
-  g_signal_connect (paned,
-                    "notify::position",
-                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
-                    leaf);
   gtk_widget_add_tick_callback (paned, ptyxis_tab_apply_split_ratio_cb, leaf, NULL);
   ptyxis_tab_update_split_sizing (self);
 

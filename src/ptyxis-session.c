@@ -61,6 +61,13 @@ ptyxis_session_save (PtyxisApplication *app)
           if (gtk_window_is_maximized (GTK_WINDOW (window)))
             g_variant_builder_add_parsed (&builder, "{'maximized', <%b>}", TRUE);
 
+          if (gtk_widget_get_width (GTK_WIDGET (window)) > 0 &&
+              gtk_widget_get_height (GTK_WIDGET (window)) > 0)
+            g_variant_builder_add (&builder, "{sv}", "size",
+                                   g_variant_new ("(ii)",
+                                                  gtk_widget_get_width (GTK_WIDGET (window)),
+                                                  gtk_widget_get_height (GTK_WIDGET (window))));
+
           g_variant_builder_open (&builder, G_VARIANT_TYPE ("{sv}"));
           g_variant_builder_add (&builder, "s", "tabs");
           g_variant_builder_open (&builder, G_VARIANT_TYPE ("v"));
@@ -193,6 +200,9 @@ ptyxis_session_restore (PtyxisApplication *app,
       PtyxisTab *active_tab = NULL;
       GVariantIter tab_iter;
       gboolean maximized;
+      gboolean has_window_size;
+      int window_height = 0;
+      int window_width = 0;
 
       if (!(tabs = g_variant_lookup_value (window, "tabs", G_VARIANT_TYPE ("aa{sv}"))) ||
           g_variant_n_children (tabs) == 0)
@@ -200,6 +210,11 @@ ptyxis_session_restore (PtyxisApplication *app,
 
       if (!g_variant_lookup (window, "maximized", "b", &maximized))
         maximized = FALSE;
+
+      has_window_size = version >= 2 &&
+                        g_variant_lookup (window, "size", "(ii)",
+                                          &window_width, &window_height) &&
+                        window_width > 0 && window_height > 0;
 
       g_variant_iter_init (&tab_iter, tabs);
       while (g_variant_iter_loop (&tab_iter, "@a{sv}", &tab))
@@ -313,6 +328,10 @@ ptyxis_session_restore (PtyxisApplication *app,
               if (!active_tab)
                 active_tab = the_tab;
             }
+
+          if (!maximized && restore_window_size && has_window_size)
+            gtk_window_set_default_size (GTK_WINDOW (the_window),
+                                         window_width, window_height);
 
           if (maximized)
             gtk_window_maximize (GTK_WINDOW (the_window));
