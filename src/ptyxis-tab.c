@@ -94,6 +94,26 @@ static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_apply_zoom (PtyxisTab *self);
 static void ptyxis_tab_remove_pane (PtyxisTab *self, PtyxisPane *pane);
+
+static void
+ptyxis_tab_update_pane_accessibility (PtyxisTab *self)
+{
+  guint n_panes;
+
+  g_assert (PTYXIS_IS_TAB (self));
+
+  n_panes = ptyxis_split_node_count_leaves (self->split_root);
+  for (guint i = 0; i < n_panes; i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+      g_autofree char *label = g_strdup_printf (_("Terminal Pane %u of %u"), i + 1, n_panes);
+
+      gtk_accessible_update_property (GTK_ACCESSIBLE (pane),
+                                      GTK_ACCESSIBLE_PROPERTY_LABEL, label,
+                                      -1);
+    }
+}
 static void ptyxis_tab_update_scrollback_lines (PtyxisTab *self);
 static void ptyxis_tab_update_cell_height_scale (PtyxisTab *self);
 static void ptyxis_tab_update_cell_width_scale (PtyxisTab *self);
@@ -977,6 +997,7 @@ ptyxis_tab_split_pane (PtyxisTab            *self,
   ptyxis_split_node_split (leaf, direction, ratio, G_OBJECT (new_pane));
   gtk_widget_add_tick_callback (paned, ptyxis_tab_apply_split_ratio_cb, leaf, NULL);
   ptyxis_tab_update_split_sizing (self);
+  ptyxis_tab_update_pane_accessibility (self);
 
   return g_steal_pointer (&new_pane);
 }
@@ -1076,6 +1097,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
   ptyxis_pane_force_quit (pane);
   ptyxis_split_node_remove (leaf);
   ptyxis_tab_update_split_sizing (self);
+  ptyxis_tab_update_pane_accessibility (self);
 }
 
 static void
@@ -1984,6 +2006,7 @@ ptyxis_tab_init (PtyxisTab *self)
   self->active_pane = self->pane;
   self->uuid = g_strdup (ptyxis_pane_get_uuid (self->pane));
   ptyxis_tab_connect_pane (self, self->pane);
+  ptyxis_tab_update_pane_accessibility (self);
 
   ptyxis_tab_notify_init (&self->notify, self);
 
