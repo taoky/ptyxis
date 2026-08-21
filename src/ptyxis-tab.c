@@ -2775,6 +2775,24 @@ ptyxis_tab_set_needs_attention (PtyxisTab *self,
     adw_tab_page_set_needs_attention (page, needs_attention);
 }
 
+void
+ptyxis_tab_set_search_target_visible (PtyxisTab *self,
+                                      gboolean   visible)
+{
+  g_return_if_fail (PTYXIS_IS_TAB (self));
+
+  for (guint i = 0; i < ptyxis_split_node_count_leaves (self->split_root); i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+
+      if (visible && pane == self->active_pane)
+        gtk_widget_add_css_class (GTK_WIDGET (pane), "search-target");
+      else
+        gtk_widget_remove_css_class (GTK_WIDGET (pane), "search-target");
+    }
+}
+
 const char *
 ptyxis_tab_get_uuid (PtyxisTab *self)
 {

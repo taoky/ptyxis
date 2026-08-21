@@ -19,6 +19,10 @@ vte-terminal.padded {
 
 vte-terminal:drop(active) { border-radius: 0 0 11px 11px; }
 
+ptyxis-pane.search-target vte-terminal {
+  box-shadow: inset 0 0 0 2px var(--accent-bg-color);
+}
+
 window.maximized vte-terminal:drop(active),
 window.tiled-bottom vte-terminal:drop(active) { border-radius: 0; }
 

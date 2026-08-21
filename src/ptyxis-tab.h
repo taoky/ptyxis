@@ -94,6 +94,8 @@ void                ptyxis_tab_force_quit                         (PtyxisTab    
 void                ptyxis_tab_show_banner                        (PtyxisTab            *self);
 void                ptyxis_tab_set_needs_attention                (PtyxisTab            *self,
                                                                    gboolean              needs_attention);
+void                ptyxis_tab_set_search_target_visible          (PtyxisTab            *self,
+                                                                   gboolean              visible);
 PtyxisIpcContainer *ptyxis_tab_dup_container                      (PtyxisTab            *self);
 void                ptyxis_tab_set_container                      (PtyxisTab            *self,
                                                                    PtyxisIpcContainer   *container);

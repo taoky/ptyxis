@@ -1484,6 +1484,39 @@ ptyxis_window_notify_zoom_cb (PtyxisWindow *self,
 }
 
 static void
+ptyxis_window_update_search_target (PtyxisWindow *self)
+{
+  PtyxisTab *active_tab;
+  gboolean visible;
+  guint n_pages;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+
+  active_tab = ptyxis_window_get_active_tab (self);
+  visible = gtk_revealer_get_reveal_child (self->find_bar_revealer);
+  n_pages = adw_tab_view_get_n_pages (self->tab_view);
+
+  for (guint i = 0; i < n_pages; i++)
+    {
+      AdwTabPage *page = adw_tab_view_get_nth_page (self->tab_view, i);
+      PtyxisTab *tab = PTYXIS_TAB (adw_tab_page_get_child (page));
+
+      ptyxis_tab_set_search_target_visible (tab, visible && tab == active_tab);
+    }
+}
+
+static void
+ptyxis_window_find_bar_revealer_notify_cb (PtyxisWindow *self,
+                                           GParamSpec   *pspec,
+                                           GtkRevealer  *revealer)
+{
+  g_assert (PTYXIS_IS_WINDOW (self));
+  g_assert (GTK_IS_REVEALER (revealer));
+
+  ptyxis_window_update_search_target (self);
+}
+
+static void
 ptyxis_window_notify_active_pane_cb (PtyxisWindow *self,
                                      GParamSpec   *pspec,
                                      PtyxisTab    *tab)
@@ -1492,7 +1525,10 @@ ptyxis_window_notify_active_pane_cb (PtyxisWindow *self,
   g_assert (PTYXIS_IS_TAB (tab));
 
   if (tab == ptyxis_window_get_active_tab (self))
-    ptyxis_find_bar_set_terminal (self->find_bar, ptyxis_tab_get_terminal (tab));
+    {
+      ptyxis_find_bar_set_terminal (self->find_bar, ptyxis_tab_get_terminal (tab));
+      ptyxis_window_update_search_target (self);
+    }
 }
 
 static void
@@ -2213,6 +2249,12 @@ ptyxis_window_init (PtyxisWindow *self)
   self->shortcuts = g_object_ref (ptyxis_application_get_shortcuts (PTYXIS_APPLICATION_DEFAULT));
 
   gtk_widget_init_template (GTK_WIDGET (self));
+
+  g_signal_connect_object (self->find_bar_revealer,
+                           "notify::reveal-child",
+                           G_CALLBACK (ptyxis_window_find_bar_revealer_notify_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
 
   default_icon = g_themed_icon_new ("utilities-terminal-symbolic");
   adw_tab_view_set_default_icon (self->tab_view, default_icon);
