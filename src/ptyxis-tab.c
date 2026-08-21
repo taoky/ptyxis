@@ -92,6 +92,28 @@ static void ptyxis_tab_respawn (PtyxisTab *self);
 static void ptyxis_tab_respawn_pane (PtyxisTab *self, PtyxisPane *pane);
 static void ptyxis_tab_apply_zoom (PtyxisTab *self);
 static void ptyxis_tab_remove_pane (PtyxisTab *self, PtyxisPane *pane);
+
+static void
+ptyxis_tab_update_split_sizing (PtyxisTab *self)
+{
+  guint n_panes;
+  gboolean propagate_natural;
+
+  g_assert (PTYXIS_IS_TAB (self));
+
+  n_panes = ptyxis_split_node_count_leaves (self->split_root);
+  propagate_natural = n_panes == 1;
+
+  for (guint i = 0; i < n_panes; i++)
+    {
+      PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
+      PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
+      GtkScrolledWindow *scroller = ptyxis_pane_get_scrolled_window (pane);
+
+      gtk_scrolled_window_set_propagate_natural_width (scroller, propagate_natural);
+      gtk_scrolled_window_set_propagate_natural_height (scroller, propagate_natural);
+    }
+}
 static void ptyxis_tab_profile_signals_bind_cb (PtyxisTab     *self,
                                                 PtyxisProfile *profile,
                                                 GSignalGroup  *group);
@@ -791,6 +813,7 @@ ptyxis_tab_split_action (GtkWidget  *widget,
   g_object_unref (self->active_pane);
 
   ptyxis_split_node_split (leaf, direction, .5, G_OBJECT (new_pane));
+  ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_set_active_pane (self, new_pane);
   ptyxis_tab_update_scrollback_lines (self);
   ptyxis_tab_update_cell_height_scale (self);
@@ -856,6 +879,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
 
   ptyxis_pane_force_quit (pane);
   ptyxis_split_node_remove (leaf);
+  ptyxis_tab_update_split_sizing (self);
 }
 
 static void
