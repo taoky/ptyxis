@@ -5,6 +5,7 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_dir=$(cd "$script_dir/.." && pwd)
 output_root="$source_dir/dist"
+container_engine=${CONTAINER_ENGINE:-}
 
 usage() {
   echo "Usage: $0 {debian|ubuntu|fedora|arch|flatpak|all}" >&2
@@ -58,13 +59,25 @@ build_native() {
   local export_target="export-${distro}"
   local output_dir="$output_root/$distro/$snapshot"
 
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "Docker is required to build the ${distro} package." >&2
+  if [[ -z "$container_engine" ]]; then
+    if command -v docker >/dev/null 2>&1; then
+      container_engine=docker
+    elif command -v podman >/dev/null 2>&1; then
+      container_engine=podman
+    else
+      echo "Docker or Podman is required to build the ${distro} package." >&2
+      exit 1
+    fi
+  elif [[ "$container_engine" != docker && "$container_engine" != podman ]]; then
+    echo "CONTAINER_ENGINE must be either 'docker' or 'podman'." >&2
+    exit 2
+  elif ! command -v "$container_engine" >/dev/null 2>&1; then
+    echo "The requested container engine '$container_engine' was not found." >&2
     exit 1
   fi
 
   mkdir -p "$output_dir"
-  docker build \
+  "$container_engine" build \
     --file "$work_dir/source/packaging/Dockerfile" \
     --target "$export_target" \
     --build-arg "BASE_VERSION=$base_version" \

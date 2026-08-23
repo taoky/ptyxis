@@ -45,7 +45,15 @@ configured.
 
 ## Build commands
 
-Native builds require Docker. Flatpak builds require `flatpak` and
+Native builds require Docker or Podman. The script uses Docker when both are
+installed and otherwise falls back to Podman. Set `CONTAINER_ENGINE` to select
+one explicitly, for example:
+
+```sh
+CONTAINER_ENGINE=podman ./packaging/build-packages.sh fedora
+```
+
+Flatpak builds require `flatpak` and
 `flatpak-builder` on the host.
 
 Build one target:
@@ -85,14 +93,14 @@ publication are deliberately outside this local-build workflow.
 - `debian/` is a complete debhelper package definition shared by Debian and
   Ubuntu. The container updates a temporary copy of `debian/changelog` with
   the generated snapshot version.
-- `packaging/fedora/ptyxis.spec` is the RPM definition. The Docker build passes
-  the snapshot version and release as RPM macros.
+- `packaging/fedora/ptyxis.spec` is the RPM definition. The container build
+  passes the snapshot version and release as RPM macros.
 - `packaging/arch/PKGBUILD.in` is rendered in the container with the generated
   version and source archive checksum before `makepkg` runs.
 - `packaging/flatpak/org.gnome.Ptyxis.json` pins third-party sources and builds
   the clean archived checkout with the GNOME 50 SDK.
 - `packaging/Dockerfile` contains separate build and artifact-export stages for
-  the four native targets.
+  the four native targets and is consumed by either Docker or Podman.
 
 The native builds use distribution libraries with Meson's
 `--wrap-mode=nodownload`; missing or outdated dependencies fail rather than
