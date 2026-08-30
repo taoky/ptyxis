@@ -97,6 +97,25 @@ static GActionEntry action_entries[] = {
 
 G_DEFINE_FINAL_TYPE (PtyxisApplication, ptyxis_application, ADW_TYPE_APPLICATION)
 
+gboolean
+ptyxis_application_focus_pane_by_uuid (PtyxisApplication *self,
+                                       const char        *tab_uuid,
+                                       const char        *pane_uuid)
+{
+  g_return_val_if_fail (PTYXIS_IS_APPLICATION (self), FALSE);
+
+  for (const GList *iter = gtk_application_get_windows (GTK_APPLICATION (self));
+       iter != NULL;
+       iter = iter->next)
+    {
+      if (PTYXIS_IS_WINDOW (iter->data) &&
+          ptyxis_window_focus_pane_by_uuid (iter->data, tab_uuid, pane_uuid))
+        return TRUE;
+    }
+
+  return FALSE;
+}
+
 enum {
   PROP_0,
   PROP_CONTAINERS,

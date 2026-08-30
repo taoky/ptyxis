@@ -479,6 +479,12 @@
       <description>The shortcut to show the tab overview</description>
     </key>
 
+    <key name="go-to-terminal" type="s">
+      <default>'&lt;ctrl&gt;&lt;shift&gt;p'</default>
+      <summary>Go to Terminal</summary>
+      <description>The shortcut to search and focus a terminal pane</description>
+    </key>
+
     <key name="preferences" type="s">
       <default>'&lt;ctrl&gt;comma'</default>
       <summary>Preferences</summary>

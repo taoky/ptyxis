@@ -2171,6 +2171,36 @@ ptyxis_tab_get_n_panes (PtyxisTab *self)
   return ptyxis_split_node_count_leaves (self->split_root);
 }
 
+PtyxisPane *
+ptyxis_tab_get_pane (PtyxisTab *self,
+                     guint      position)
+{
+  PtyxisSplitNode *leaf;
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+
+  leaf = ptyxis_split_node_get_nth_leaf (self->split_root, position);
+  return leaf ? PTYXIS_PANE (ptyxis_split_node_get_pane (leaf)) : NULL;
+}
+
+PtyxisPane *
+ptyxis_tab_find_pane_by_uuid (PtyxisTab  *self,
+                              const char *uuid)
+{
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+  g_return_val_if_fail (uuid != NULL, NULL);
+
+  for (guint i = 0; i < ptyxis_tab_get_n_panes (self); i++)
+    {
+      PtyxisPane *pane = ptyxis_tab_get_pane (self, i);
+
+      if (g_strcmp0 (ptyxis_pane_get_uuid (pane), uuid) == 0)
+        return pane;
+    }
+
+  return NULL;
+}
+
 static void
 ptyxis_tab_get_node_grid_size (PtyxisSplitNode *node,
                                guint           *columns,
@@ -2485,13 +2515,16 @@ ptyxis_tab_set_title_prefix (PtyxisTab  *self,
     }
 }
 
-static char *
-ptyxis_tab_dup_pane_title (PtyxisPane *pane)
+char *
+ptyxis_tab_dup_pane_title (PtyxisTab  *self,
+                           PtyxisPane *pane)
 {
   GString *gstr;
   PtyxisTerminal *terminal;
 
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
   g_return_val_if_fail (PTYXIS_IS_PANE (pane), NULL);
+  g_return_val_if_fail (ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) != NULL, NULL);
 
   terminal = ptyxis_pane_get_terminal (pane);
   gstr = g_string_new (ptyxis_pane_get_title_prefix (pane));
@@ -2534,7 +2567,7 @@ ptyxis_tab_dup_title (PtyxisTab *self)
 {
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
-  return ptyxis_tab_dup_pane_title (self->active_pane);
+  return ptyxis_tab_dup_pane_title (self, self->active_pane);
 }
 
 static char *
@@ -2553,7 +2586,7 @@ ptyxis_tab_dup_pane_titles (PtyxisTab *self,
     {
       PtyxisSplitNode *leaf = ptyxis_split_node_get_nth_leaf (self->split_root, i);
       PtyxisPane *pane = PTYXIS_PANE (ptyxis_split_node_get_pane (leaf));
-      g_autofree char *title = ptyxis_tab_dup_pane_title (pane);
+      g_autofree char *title = ptyxis_tab_dup_pane_title (self, pane);
 
       if (search_text->len > 0)
         g_string_append (search_text, separator);
@@ -2621,6 +2654,27 @@ ptyxis_tab_dup_current_directory_uri (PtyxisTab *self)
   g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
 
   return ptyxis_terminal_dup_current_directory_uri (self->terminal);
+}
+
+char *
+ptyxis_tab_dup_pane_directory (PtyxisTab  *self,
+                               PtyxisPane *pane)
+{
+  g_autofree char *uri = NULL;
+
+  g_return_val_if_fail (PTYXIS_IS_TAB (self), NULL);
+  g_return_val_if_fail (PTYXIS_IS_PANE (pane), NULL);
+  g_return_val_if_fail (ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane)) != NULL, NULL);
+
+  uri = ptyxis_terminal_dup_current_directory_uri (ptyxis_pane_get_terminal (pane));
+  if (ptyxis_str_empty0 (uri))
+    uri = g_strdup (ptyxis_pane_get_previous_working_directory_uri (pane));
+  if (ptyxis_str_empty0 (uri))
+    uri = g_strdup (ptyxis_pane_get_initial_working_directory_uri (pane));
+  if (ptyxis_str_empty0 (uri))
+    return g_strdup ("");
+
+  return ptyxis_tab_collapse_uri (uri);
 }
 
 void

@@ -41,3 +41,11 @@ split_node_test = executable('test-split-node',
   include_directories: [include_directories('..'), include_directories('../src')],
 )
 test('test-split-node', split_node_test, env: test_env)
+
+terminal_picker_test = executable('test-terminal-picker',
+  ['test-terminal-picker.c', '../src/ptyxis-terminal-picker-match.c'],
+  c_args: testsuite_c_args,
+  dependencies: dependency('glib-2.0'),
+  include_directories: [include_directories('../src')],
+)
+test('test-terminal-picker', terminal_picker_test, env: test_env)

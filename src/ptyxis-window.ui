@@ -114,6 +114,16 @@
         <child>
           <object class="GtkShortcut">
             <binding name="trigger">
+              <lookup name="go-to-terminal" type="PtyxisShortcuts">
+                <lookup name="shortcuts">PtyxisWindow</lookup>
+              </lookup>
+            </binding>
+            <property name="action">action(win.go-to-terminal)</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcut">
+            <binding name="trigger">
               <lookup name="preferences" type="PtyxisShortcuts">
                 <lookup name="shortcuts">PtyxisWindow</lookup>
               </lookup>
@@ -772,6 +782,11 @@
       </item>
     </section>
     <section>
+      <item>
+        <attribute name="id">go-to-terminal</attribute>
+        <attribute name="label" translatable="yes">_Go to Terminal…</attribute>
+        <attribute name="action">win.go-to-terminal</attribute>
+      </item>
       <item>
         <attribute name="id">tab-overview</attribute>
         <attribute name="label" translatable="yes">Show Open Tabs</attribute>

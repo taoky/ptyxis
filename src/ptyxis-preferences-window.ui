@@ -836,6 +836,13 @@
         <child>
           <object class="AdwPreferencesGroup">
             <child>
+              <object class="PtyxisShortcutRow" id="shortcut_go_to_terminal">
+                <property name="title" translatable="yes">Go to Terminal</property>
+                <property name="subtitle" translatable="yes">Search all terminal panes across windows</property>
+                <property name="shortcut-name">go-to-terminal</property>
+              </object>
+            </child>
+            <child>
               <object class="PtyxisShortcutRow" id="shortcut_tab_overview">
                 <property name="title" translatable="yes">View Tab Overview</property>
                 <property name="subtitle" translatable="yes">Show an overview of all tabs within the window</property>

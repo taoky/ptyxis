@@ -85,6 +85,7 @@ PtyxisTabMonitor *ptyxis_pane_get_monitor (PtyxisPane      *self);
 void              ptyxis_pane_set_monitor (PtyxisPane      *self,
                                             PtyxisTabMonitor *monitor);
 const char       *ptyxis_pane_get_uuid     (PtyxisPane      *self);
+gint64            ptyxis_pane_get_last_focus_time (PtyxisPane *self);
 const char *const *ptyxis_pane_get_command (PtyxisPane      *self);
 void              ptyxis_pane_set_command (PtyxisPane      *self,
                                             const char *const *command);

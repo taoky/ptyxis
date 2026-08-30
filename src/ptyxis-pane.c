@@ -33,6 +33,7 @@ struct _PtyxisPane
   PtyxisProcessLeaderKind leader_kind : 3;
   PtyxisPaneState state : 3;
   gint64 respawn_time;
+  gint64 last_focus_time;
   guint forced_exit : 1;
   guint ignore_osc_title : 1;
   guint inhibit_cookie;
@@ -82,7 +83,10 @@ ptyxis_pane_focus_changed_cb (PtyxisPane               *self,
   g_assert (GTK_IS_EVENT_CONTROLLER_FOCUS (controller));
 
   if (gtk_event_controller_focus_contains_focus (controller))
-    g_signal_emit (self, signals[FOCUS_ENTERED], 0);
+    {
+      self->last_focus_time = g_get_monotonic_time ();
+      g_signal_emit (self, signals[FOCUS_ENTERED], 0);
+    }
 }
 
 G_DEFINE_FINAL_TYPE (PtyxisPane, ptyxis_pane, GTK_TYPE_WIDGET)
@@ -403,6 +407,13 @@ ptyxis_pane_get_uuid (PtyxisPane *self)
 {
   g_return_val_if_fail (PTYXIS_IS_PANE (self), NULL);
   return self->uuid;
+}
+
+gint64
+ptyxis_pane_get_last_focus_time (PtyxisPane *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_PANE (self), 0);
+  return self->last_focus_time;
 }
 
 const char *const *

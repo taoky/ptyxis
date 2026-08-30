@@ -34,6 +34,7 @@
 #include "ptyxis-shrinker.h"
 #include "ptyxis-tab-monitor.h"
 #include "ptyxis-tab-private.h"
+#include "ptyxis-terminal-picker.h"
 #include "ptyxis-theme-selector.h"
 #include "ptyxis-title-dialog.h"
 #include "ptyxis-profile-dialog.h"
@@ -1382,6 +1383,19 @@ ptyxis_window_show_keyboard_shortcuts_action (GtkWidget  *widget,
 }
 
 static void
+ptyxis_window_go_to_terminal_action (GtkWidget  *widget,
+                                     const char *action_name,
+                                     GVariant   *param)
+{
+  PtyxisTerminalPicker *picker;
+
+  g_assert (PTYXIS_IS_WINDOW (widget));
+
+  picker = ptyxis_terminal_picker_new (PTYXIS_WINDOW (widget));
+  adw_dialog_present (ADW_DIALOG (picker), widget);
+}
+
+static void
 ptyxis_window_primary_menu_action (GtkWidget  *widget,
                                    const char *action_name,
                                    GVariant   *param)
@@ -2215,6 +2229,7 @@ ptyxis_window_class_init (PtyxisWindowClass *klass)
   gtk_widget_class_install_action (widget_class, "win.unfullscreen", NULL, ptyxis_window_unfullscreen_action);
   gtk_widget_class_install_action (widget_class, "win.toggle-fullscreen", NULL, ptyxis_window_toggle_fullscreen);
   gtk_widget_class_install_action (widget_class, "win.tab-overview", NULL, ptyxis_window_tab_overview_action);
+  gtk_widget_class_install_action (widget_class, "win.go-to-terminal", NULL, ptyxis_window_go_to_terminal_action);
   gtk_widget_class_install_action (widget_class, "win.zoom-in", "b", ptyxis_window_zoom_in_action);
   gtk_widget_class_install_action (widget_class, "win.zoom-out", "b", ptyxis_window_zoom_out_action);
   gtk_widget_class_install_action (widget_class, "win.zoom-one", "b", ptyxis_window_zoom_one_action);
@@ -2741,6 +2756,38 @@ ptyxis_window_focus_tab_by_uuid (PtyxisWindow *self,
           ptyxis_tab_grab_focus (tab);
           return TRUE;
         }
+    }
+
+  return FALSE;
+}
+
+gboolean
+ptyxis_window_focus_pane_by_uuid (PtyxisWindow *self,
+                                  const char   *tab_uuid,
+                                  const char   *pane_uuid)
+{
+  guint n_pages;
+
+  g_return_val_if_fail (PTYXIS_IS_WINDOW (self), FALSE);
+  g_return_val_if_fail (tab_uuid != NULL, FALSE);
+  g_return_val_if_fail (pane_uuid != NULL, FALSE);
+
+  n_pages = adw_tab_view_get_n_pages (self->tab_view);
+  for (guint i = 0; i < n_pages; i++)
+    {
+      AdwTabPage *page = adw_tab_view_get_nth_page (self->tab_view, i);
+      PtyxisTab *tab = PTYXIS_TAB (adw_tab_page_get_child (page));
+      PtyxisPane *pane;
+
+      if (g_strcmp0 (ptyxis_tab_get_uuid (tab), tab_uuid) != 0 ||
+          !(pane = ptyxis_tab_find_pane_by_uuid (tab, pane_uuid)))
+        continue;
+
+      adw_tab_view_set_selected_page (self->tab_view, page);
+      ptyxis_tab_set_active_pane (tab, pane);
+      gtk_window_present (GTK_WINDOW (self));
+      gtk_widget_grab_focus (GTK_WIDGET (ptyxis_pane_get_terminal (pane)));
+      return TRUE;
     }
 
   return FALSE;

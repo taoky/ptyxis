@@ -41,6 +41,9 @@ const char         *ptyxis_application_get_user_data_dir          (PtyxisApplica
 const char         *ptyxis_application_get_os_name                (PtyxisApplication    *self);
 PtyxisSettings     *ptyxis_application_get_settings               (PtyxisApplication    *self);
 PtyxisShortcuts    *ptyxis_application_get_shortcuts              (PtyxisApplication    *self);
+gboolean            ptyxis_application_focus_pane_by_uuid          (PtyxisApplication    *self,
+                                                                    const char           *tab_uuid,
+                                                                    const char           *pane_uuid);
 const char         *ptyxis_application_get_system_font_name       (PtyxisApplication    *self);
 gboolean            ptyxis_application_get_overlay_scrollbars     (PtyxisApplication    *self);
 gboolean            ptyxis_application_control_is_pressed         (PtyxisApplication    *self);

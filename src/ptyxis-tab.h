@@ -49,6 +49,10 @@ void                ptyxis_tab_set_active_pane                    (PtyxisTab    
                                                                    PtyxisPane           *pane);
 PtyxisSplitNode    *ptyxis_tab_get_split_root                     (PtyxisTab            *self);
 guint               ptyxis_tab_get_n_panes                        (PtyxisTab            *self);
+PtyxisPane         *ptyxis_tab_get_pane                            (PtyxisTab            *self,
+                                                                   guint                 position);
+PtyxisPane         *ptyxis_tab_find_pane_by_uuid                   (PtyxisTab            *self,
+                                                                   const char           *uuid);
 void                ptyxis_tab_get_grid_size                      (PtyxisTab            *self,
                                                                    guint                *columns,
                                                                    guint                *rows);
@@ -68,6 +72,10 @@ void                ptyxis_tab_set_command                        (PtyxisTab    
 GIcon              *ptyxis_tab_dup_indicator_icon                 (PtyxisTab            *self);
 char               *ptyxis_tab_dup_subtitle                       (PtyxisTab            *self);
 char               *ptyxis_tab_dup_title                          (PtyxisTab            *self);
+char               *ptyxis_tab_dup_pane_title                     (PtyxisTab            *self,
+                                                                   PtyxisPane           *pane);
+char               *ptyxis_tab_dup_pane_directory                 (PtyxisTab            *self,
+                                                                   PtyxisPane           *pane);
 char               *ptyxis_tab_dup_search_text                    (PtyxisTab            *self);
 char               *ptyxis_tab_dup_overview_title                 (PtyxisTab            *self);
 gboolean            ptyxis_tab_get_ignore_osc_title               (PtyxisTab            *self);
