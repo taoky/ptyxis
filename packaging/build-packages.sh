@@ -45,13 +45,14 @@ ubuntu_version="${base_version}+${snapshot}-1~ubuntu26.04.1"
 rpm_release="0.${snapshot}"
 arch_version="${base_version}.r${revision_count}.g${short_commit}"
 
-work_dir=$(mktemp -d -t ptyxis-packaging.XXXXXXXX)
+mkdir -p "$output_root"
+work_dir=$(mktemp -d "$output_root/.packaging.XXXXXXXX")
 cleanup() {
   rm -rf -- "$work_dir"
 }
 trap cleanup EXIT
 
-mkdir -p "$work_dir/source" "$output_root"
+mkdir -p "$work_dir/source"
 git -C "$source_dir" archive --format=tar HEAD | tar -xf - -C "$work_dir/source"
 
 build_native() {
