@@ -1068,8 +1068,8 @@ ptyxis_tab_split_action (GtkWidget  *widget,
               : PTYXIS_SPLIT_VERTICAL;
   else
     direction = g_str_equal (action_name, "tab.split-horizontal")
-              ? PTYXIS_SPLIT_HORIZONTAL
-              : PTYXIS_SPLIT_VERTICAL;
+              ? PTYXIS_SPLIT_VERTICAL
+              : PTYXIS_SPLIT_HORIZONTAL;
   new_pane = ptyxis_tab_split_pane (self, self->active_pane, direction, .5);
   g_return_if_fail (new_pane != NULL);
   ptyxis_tab_set_active_pane (self, new_pane);
