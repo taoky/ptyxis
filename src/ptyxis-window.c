@@ -615,6 +615,8 @@ ptyxis_window_apply_current_settings (PtyxisWindow *self,
       const char *current_container_runtime = ptyxis_terminal_get_current_container_runtime (terminal);
       PtyxisZoomLevel zoom = ptyxis_tab_get_zoom (active_tab);
       g_autoptr(PtyxisIpcContainer) current_container = NULL;
+      guint columns;
+      guint rows;
 
       if (ptyxis_profile_get_preserve_container (profile) != PTYXIS_PRESERVE_CONTAINER_NEVER)
         {
@@ -629,11 +631,8 @@ ptyxis_window_apply_current_settings (PtyxisWindow *self,
         ptyxis_tab_set_previous_working_directory_uri (tab, current_directory_uri);
 
       ptyxis_tab_set_zoom (tab, zoom);
-
-      if (ptyxis_tab_get_n_panes (active_tab) == 1)
-        vte_terminal_set_size (VTE_TERMINAL (ptyxis_tab_get_terminal (tab)),
-                               vte_terminal_get_column_count (VTE_TERMINAL (terminal)),
-                               vte_terminal_get_row_count (VTE_TERMINAL (terminal)));
+      ptyxis_tab_get_grid_size (active_tab, &columns, &rows);
+      vte_terminal_set_size (VTE_TERMINAL (ptyxis_tab_get_terminal (tab)), columns, rows);
     }
 }
 
