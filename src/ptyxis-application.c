@@ -30,6 +30,7 @@
 #include "ptyxis-application.h"
 #include "ptyxis-build-ident.h"
 #include "ptyxis-client.h"
+#include "ptyxis-global-shortcuts.h"
 #include "ptyxis-palette.h"
 #include "ptyxis-preferences-window.h"
 #include "ptyxis-session.h"
@@ -50,6 +51,7 @@ struct _PtyxisApplication
   char                *next_title_prefix;
   char                *system_font_name;
   GDBusProxy          *portal;
+  PtyxisGlobalShortcuts *global_shortcuts;
   PtyxisClient        *client;
   PtyxisWindow        *quake_window;
   GHashTable          *exited;
@@ -88,6 +90,8 @@ static void ptyxis_application_focus_pane_by_uuid_action (GSimpleAction *action,
                                                           gpointer       user_data);
 static void ptyxis_application_apply_default_size(PtyxisApplication *self,
                                                   PtyxisTerminal    *terminal);
+static void ptyxis_application_toggle_quake       (PtyxisApplication *self,
+                                                   const char        *activation_token);
 
 static GActionEntry action_entries[] = {
   { "about", ptyxis_application_about },
@@ -404,7 +408,8 @@ get_current_window (PtyxisApplication *self)
 }
 
 static void
-ptyxis_application_toggle_quake (PtyxisApplication *self)
+ptyxis_application_toggle_quake (PtyxisApplication *self,
+                                  const char        *activation_token)
 {
   g_assert (PTYXIS_IS_APPLICATION (self));
 
@@ -424,11 +429,25 @@ ptyxis_application_toggle_quake (PtyxisApplication *self)
     {
       PtyxisTab *tab = ptyxis_window_get_active_tab (self->quake_window);
 
+      if (activation_token != NULL)
+        gtk_window_set_startup_id (GTK_WINDOW (self->quake_window), activation_token);
+
       gtk_window_present (GTK_WINDOW (self->quake_window));
 
       if (tab != NULL)
         ptyxis_tab_grab_focus (tab);
     }
+}
+
+static void
+ptyxis_application_global_shortcut_activated_cb (PtyxisApplication     *self,
+                                                 const char            *activation_token,
+                                                 PtyxisGlobalShortcuts *global_shortcuts)
+{
+  g_assert (PTYXIS_IS_APPLICATION (self));
+  g_assert (PTYXIS_IS_GLOBAL_SHORTCUTS (global_shortcuts));
+
+  ptyxis_application_toggle_quake (self, activation_token);
 }
 
 static void
@@ -542,7 +561,10 @@ ptyxis_application_command_line (GApplication            *app,
           return EXIT_FAILURE;
         }
 
-      ptyxis_application_toggle_quake (self);
+      if (self->global_shortcuts != NULL)
+        ptyxis_global_shortcuts_ensure_bound (self->global_shortcuts);
+
+      ptyxis_application_toggle_quake (self, NULL);
       return EXIT_SUCCESS;
     }
 
@@ -996,6 +1018,13 @@ ptyxis_application_startup (GApplication *application)
 
   G_APPLICATION_CLASS (ptyxis_application_parent_class)->startup (application);
 
+  if (!is_standalone (self))
+    {
+      self->global_shortcuts =
+        ptyxis_global_shortcuts_new (g_application_get_application_id (application));
+      ptyxis_global_shortcuts_register (self->global_shortcuts);
+    }
+
   if ((sandbox_agent = ptyxis_application_should_sandbox_agent (self)))
     timeout_msec = G_MAXINT;
   else
@@ -1054,6 +1083,16 @@ ptyxis_application_startup (GApplication *application)
                                      NULL,
                                      G_FILE_MONITOR_EVENT_CHANGED,
                                      self->xdg_terminals_list_monitor);
+    }
+
+  if (self->global_shortcuts != NULL)
+    {
+      g_signal_connect_object (self->global_shortcuts,
+                               "activated",
+                               G_CALLBACK (ptyxis_application_global_shortcut_activated_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+      ptyxis_global_shortcuts_start (self->global_shortcuts);
     }
 
   /* Setup portal to get settings */
@@ -1116,6 +1155,7 @@ ptyxis_application_finalize (GObject *object)
   g_clear_object (&self->xdg_terminals_list_monitor);
   g_clear_object (&self->profiles);
   g_clear_object (&self->portal);
+  g_clear_object (&self->global_shortcuts);
   g_clear_object (&self->shortcuts);
   g_clear_object (&self->settings);
   g_clear_object (&self->client);
