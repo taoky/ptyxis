@@ -103,6 +103,7 @@ G_DEFINE_FINAL_TYPE (PtyxisWindow, ptyxis_window, ADW_TYPE_APPLICATION_WINDOW)
 enum {
   PROP_0,
   PROP_ACTIVE_TAB,
+  PROP_QUAKE_MODE,
   PROP_SHORTCUTS,
   N_PROPS
 };
@@ -1150,6 +1151,19 @@ ptyxis_window_unfullscreen_action (GtkWidget  *widget,
 }
 
 static void
+ptyxis_window_hide_quake_action (GtkWidget  *widget,
+                                 const char *action_name,
+                                 GVariant   *param)
+{
+  PtyxisWindow *self = (PtyxisWindow *)widget;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+
+  if (self->quake_mode)
+    gtk_widget_set_visible (widget, FALSE);
+}
+
+static void
 ptyxis_window_toggle_fullscreen (GtkWidget  *widget,
                                  const char *action_name,
                                  GVariant   *param)
@@ -2121,6 +2135,10 @@ ptyxis_window_get_property (GObject    *object,
       g_value_set_object (value, ptyxis_window_get_active_tab (self));
       break;
 
+    case PROP_QUAKE_MODE:
+      g_value_set_boolean (value, ptyxis_window_get_quake_mode (self));
+      break;
+
     case PROP_SHORTCUTS:
       g_value_set_object (value, self->shortcuts);
       break;
@@ -2142,6 +2160,10 @@ ptyxis_window_set_property (GObject      *object,
     {
     case PROP_ACTIVE_TAB:
       ptyxis_window_set_active_tab (self, g_value_get_object (value));
+      break;
+
+    case PROP_QUAKE_MODE:
+      ptyxis_window_set_quake_mode (self, g_value_get_boolean (value));
       break;
 
     default:
@@ -2179,6 +2201,13 @@ ptyxis_window_class_init (PtyxisWindowClass *klass)
                          PTYXIS_TYPE_SHORTCUTS,
                          (G_PARAM_READABLE |
                           G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_QUAKE_MODE] =
+    g_param_spec_boolean ("quake-mode", NULL, NULL,
+                          FALSE,
+                          (G_PARAM_READWRITE |
+                           G_PARAM_EXPLICIT_NOTIFY |
+                           G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
 
@@ -2232,6 +2261,7 @@ ptyxis_window_class_init (PtyxisWindowClass *klass)
   gtk_widget_class_install_action (widget_class, "win.new-terminal", "(ss)", ptyxis_window_new_terminal_action);
   gtk_widget_class_install_action (widget_class, "win.fullscreen", NULL, ptyxis_window_fullscreen_action);
   gtk_widget_class_install_action (widget_class, "win.unfullscreen", NULL, ptyxis_window_unfullscreen_action);
+  gtk_widget_class_install_action (widget_class, "win.hide-quake", NULL, ptyxis_window_hide_quake_action);
   gtk_widget_class_install_action (widget_class, "win.toggle-fullscreen", NULL, ptyxis_window_toggle_fullscreen);
   gtk_widget_class_install_action (widget_class, "win.tab-overview", NULL, ptyxis_window_tab_overview_action);
   gtk_widget_class_install_action (widget_class, "win.go-to-terminal", NULL, ptyxis_window_go_to_terminal_action);
@@ -2827,5 +2857,17 @@ ptyxis_window_set_quake_mode (PtyxisWindow *self,
 {
   g_return_if_fail (PTYXIS_IS_WINDOW (self));
 
-  self->quake_mode = !!quake_mode;
+  quake_mode = !!quake_mode;
+
+  if (self->quake_mode == quake_mode)
+    return;
+
+  self->quake_mode = quake_mode;
+
+  if (quake_mode)
+    gtk_widget_add_css_class (GTK_WIDGET (self), "quake");
+  else
+    gtk_widget_remove_css_class (GTK_WIDGET (self), "quake");
+
+  g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_QUAKE_MODE]);
 }

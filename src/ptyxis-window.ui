@@ -643,17 +643,53 @@
                           </object>
                         </child>
                         <child type="title">
-                          <object class="AdwWindowTitle">
-                            <binding name="subtitle">
-                              <lookup name="subtitle" type="PtyxisTab">
-                                <lookup name="active-tab">PtyxisWindow</lookup>
-                              </lookup>
-                            </binding>
-                            <binding name="title">
-                              <lookup name="title" type="PtyxisTab">
-                                  <lookup name="active-tab">PtyxisWindow</lookup>
-                                </lookup>
-                            </binding>
+                          <object class="GtkBox">
+                            <property name="spacing">8</property>
+                            <property name="valign">center</property>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="spacing">4</property>
+                                <property name="valign">center</property>
+                                <property name="tooltip-text" translatable="yes">Quake Terminal Window</property>
+                                <property name="visible" bind-source="PtyxisWindow" bind-property="quake-mode" bind-flags="sync-create"/>
+                                <style>
+                                  <class name="quake-badge"/>
+                                </style>
+                                <child>
+                                  <object class="GtkImage">
+                                    <property name="icon-name">utilities-terminal-symbolic</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label" translatable="yes">Quake</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="AdwWindowTitle">
+                                <binding name="subtitle">
+                                  <lookup name="subtitle" type="PtyxisTab">
+                                    <lookup name="active-tab">PtyxisWindow</lookup>
+                                  </lookup>
+                                </binding>
+                                <binding name="title">
+                                  <lookup name="title" type="PtyxisTab">
+                                    <lookup name="active-tab">PtyxisWindow</lookup>
+                                  </lookup>
+                                </binding>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                        <child type="end">
+                          <object class="GtkButton">
+                            <property name="icon-name">pan-up-symbolic</property>
+                            <property name="tooltip-text" translatable="yes">Hide Quake Window</property>
+                            <property name="action-name">win.hide-quake</property>
+                            <property name="focus-on-click">false</property>
+                            <property name="visible" bind-source="PtyxisWindow" bind-property="quake-mode" bind-flags="sync-create"/>
                           </object>
                         </child>
                         <child type="end">
