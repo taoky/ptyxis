@@ -296,20 +296,19 @@
     </section>
     <section>
       <item>
+        <attribute name="id">split-auto</attribute>
+        <attribute name="label" translatable="yes">Split _Automatically</attribute>
+        <attribute name="action">tab.split-auto</attribute>
+      </item>
+      <item>
+        <attribute name="id">split-horizontal</attribute>
         <attribute name="label" translatable="yes">Split _Horizontally</attribute>
         <attribute name="action">tab.split-horizontal</attribute>
       </item>
       <item>
+        <attribute name="id">split-vertical</attribute>
         <attribute name="label" translatable="yes">Split _Vertically</attribute>
         <attribute name="action">tab.split-vertical</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Focus _Next Pane</attribute>
-        <attribute name="action">tab.focus-pane-next</attribute>
-      </item>
-      <item>
-        <attribute name="label" translatable="yes">Focus _Previous Pane</attribute>
-        <attribute name="action">tab.focus-pane-previous</attribute>
       </item>
       <item>
         <attribute name="label" translatable="yes">_Close Pane</attribute>
