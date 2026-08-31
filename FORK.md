@@ -8,13 +8,14 @@
 > tests, the fork has **not** been completely tested as a whole. Expect bugs and
 > regressions, review the code before relying on it, and use it with caution.
 >
+> In the worst case, the fork build might crash and your work would be lost.
+>
 > Considering this, the modifications in this fork is highly impossible to be
 > merged by upstream. You can use it whatever you like.
 
-This document summarizes the downstream changes on the `tky-flavored` branch.
-The documented fork-specific history currently consists of the 74 commits after
-`2615eec` (`flatpak: Use GNOME SDK 50`). Upstream changes incorporated before
-that point are not listed here.
+## Select to copy
+
+A feature I like, but [temporarily denied by upstream](https://gitlab.gnome.org/chergert/ptyxis/-/work_items/276) as title suggests.
 
 ## Terminal panes and splitting
 
@@ -39,13 +40,13 @@ The largest change is support for multiple terminal panes inside one tab.
 - Split regions are exposed to accessibility tools, and the selected pane is
   visually highlighted when navigating from search results.
 
-The default configurable shortcuts are:
+The default configurable shortcuts (as Tilix) are:
 
 | Operation | Default shortcut |
 | --- | --- |
-| Split automatically | `Ctrl+Alt+A` |
-| Split horizontally (top/bottom) | `Ctrl+Alt+D` |
-| Split vertically (left/right) | `Ctrl+Alt+R` |
+| Split **a**utomatically | `Ctrl+Alt+A` |
+| Split horizontally (top/bottom, **d**own) | `Ctrl+Alt+D` |
+| Split vertically (left/**r**ight) | `Ctrl+Alt+R` |
 | Focus pane left/right/up/down | `Alt+Arrow` |
 
 The terminal context menu includes all three split operations and displays
