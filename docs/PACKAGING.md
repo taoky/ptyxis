@@ -31,8 +31,14 @@ All targets are built from `git archive HEAD`. Tracked modifications staged or
 unstaged cause the build to stop. Untracked files, including `PLAN.md`, are not
 part of the archive and do not affect the package.
 
-The script reads the base version from `meson.build` and derives snapshot
-versions from the commit timestamp and short commit ID. For example:
+When `HEAD` is exactly at a tag, the script uses that tag as the package
+version (with an optional leading `v` removed). For example, tag `50.2`
+produces Debian `50.2-1`, Ubuntu `50.2-1~ubuntu26.04.1`, Fedora `50.2-1.fc44`,
+Arch `50.2-1`, and `ptyxis-50.2-x86_64.flatpak`.
+
+For commits without an exact tag, the script reads the base version from
+`meson.build` and derives snapshot versions from the commit timestamp and
+short commit ID. For example:
 
 - Debian: `50.2+git20260821.28c8c32-1`
 - Ubuntu: `50.2+git20260821.28c8c32-1~ubuntu26.04.1`

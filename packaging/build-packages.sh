@@ -34,18 +34,38 @@ fi
 
 short_commit=$(git -C "$source_dir" rev-parse --short=8 HEAD)
 commit_date=$(TZ=UTC git -C "$source_dir" show -s --format=%cd --date=format:%Y%m%d HEAD)
-latest_tag=$(git -C "$source_dir" describe --tags --abbrev=0 2>/dev/null || true)
-if [[ -n "$latest_tag" ]]; then
-  revision_count=$(git -C "$source_dir" rev-list --count "$latest_tag..HEAD")
-else
-  revision_count=$(git -C "$source_dir" rev-list --count HEAD)
-fi
+release_tag=$(git -C "$source_dir" describe --tags --exact-match HEAD 2>/dev/null || true)
 
-snapshot="git${commit_date}.${short_commit}"
-debian_version="${base_version}+${snapshot}-1"
-ubuntu_version="${base_version}+${snapshot}-1~ubuntu26.04.1"
-rpm_release="0.${snapshot}"
-arch_version="${base_version}.r${revision_count}.g${short_commit}"
+if [[ -n "$release_tag" ]]; then
+  package_version=${release_tag#v}
+  if [[ ! "$package_version" =~ ^[0-9][0-9A-Za-z.+~]*$ ]]; then
+    echo "Tag '$release_tag' is not a supported package version." >&2
+    exit 1
+  fi
+
+  build_label=$package_version
+  flatpak_version=$package_version
+  debian_version="${package_version}-1"
+  ubuntu_version="${package_version}-1~ubuntu26.04.1"
+  rpm_release=1
+  arch_version=$package_version
+else
+  latest_tag=$(git -C "$source_dir" describe --tags --abbrev=0 2>/dev/null || true)
+  if [[ -n "$latest_tag" ]]; then
+    revision_count=$(git -C "$source_dir" rev-list --count "$latest_tag..HEAD")
+  else
+    revision_count=$(git -C "$source_dir" rev-list --count HEAD)
+  fi
+
+  snapshot="git${commit_date}.${short_commit}"
+  package_version=$base_version
+  build_label=$snapshot
+  flatpak_version="${base_version}+${snapshot}"
+  debian_version="${base_version}+${snapshot}-1"
+  ubuntu_version="${base_version}+${snapshot}-1~ubuntu26.04.1"
+  rpm_release="0.${snapshot}"
+  arch_version="${base_version}.r${revision_count}.g${short_commit}"
+fi
 
 mkdir -p "$output_root"
 work_dir=$(mktemp -d "$output_root/.packaging.XXXXXXXX")
@@ -57,10 +77,22 @@ trap cleanup EXIT
 mkdir -p "$work_dir/source"
 git -C "$source_dir" archive --format=tar HEAD | tar -xf - -C "$work_dir/source"
 
+if [[ -n "$release_tag" ]]; then
+  sed -i \
+    "0,/^[[:space:]]*version: '[^']*',\$/s//          version: '${package_version}',/" \
+    "$work_dir/source/meson.build"
+  archived_version=$(sed -n "s/^[[:space:]]*version:[[:space:]]*'\([^']*\)'.*/\1/p" \
+    "$work_dir/source/meson.build")
+  if [[ "$archived_version" != "$package_version" ]]; then
+    echo "Unable to set archived project version to '$package_version'." >&2
+    exit 1
+  fi
+fi
+
 build_native() {
   local distro=$1
   local export_target="export-${distro}"
-  local output_dir="$output_root/$distro/$snapshot"
+  local output_dir="$output_root/$distro/$build_label"
   local -a build_command
   local -a cache_args=()
 
@@ -107,7 +139,7 @@ build_native() {
     "${cache_args[@]}" \
     --file "$work_dir/source/packaging/Dockerfile" \
     --target "$export_target" \
-    --build-arg "BASE_VERSION=$base_version" \
+    --build-arg "BASE_VERSION=$package_version" \
     --build-arg "DEBIAN_VERSION=$debian_version" \
     --build-arg "UBUNTU_VERSION=$ubuntu_version" \
     --build-arg "RPM_RELEASE=$rpm_release" \
@@ -130,7 +162,7 @@ build_flatpak() {
 
   flatpak_arch=$(flatpak --default-arch)
   mkdir -p "$output_root/flatpak"
-  bundle="$output_root/flatpak/ptyxis-${base_version}+${snapshot}-${flatpak_arch}.flatpak"
+  bundle="$output_root/flatpak/ptyxis-${flatpak_version}-${flatpak_arch}.flatpak"
 
   if [[ -n "$flatpak_builder_state_dir" ]]; then
     mkdir -p "$flatpak_builder_state_dir"
