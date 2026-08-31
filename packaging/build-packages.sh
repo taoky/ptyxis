@@ -6,6 +6,8 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source_dir=$(cd "$script_dir/.." && pwd)
 output_root="$source_dir/dist"
 container_engine=${CONTAINER_ENGINE:-}
+container_cache=${CONTAINER_CACHE:-}
+flatpak_builder_state_dir=${FLATPAK_BUILDER_STATE_DIR:-}
 
 usage() {
   echo "Usage: $0 {debian|ubuntu|fedora|arch|flatpak|all}" >&2
@@ -59,6 +61,8 @@ build_native() {
   local distro=$1
   local export_target="export-${distro}"
   local output_dir="$output_root/$distro/$snapshot"
+  local -a build_command
+  local -a cache_args=()
 
   if [[ -z "$container_engine" ]]; then
     if command -v docker >/dev/null 2>&1; then
@@ -77,8 +81,30 @@ build_native() {
     exit 1
   fi
 
+  build_command=("$container_engine" build)
+  case "$container_cache" in
+    "") ;;
+    gha)
+      if [[ "$container_engine" != docker ]] ||
+         ! docker buildx version >/dev/null 2>&1; then
+        echo "CONTAINER_CACHE=gha requires Docker Buildx." >&2
+        exit 1
+      fi
+      build_command=(docker buildx build)
+      cache_args=(
+        --cache-from "type=gha,scope=ptyxis-${distro}"
+        --cache-to "type=gha,mode=max,scope=ptyxis-${distro}"
+      )
+      ;;
+    *)
+      echo "Unsupported CONTAINER_CACHE value '$container_cache'." >&2
+      exit 2
+      ;;
+  esac
+
   mkdir -p "$output_dir"
-  "$container_engine" build \
+  "${build_command[@]}" \
+    "${cache_args[@]}" \
     --file "$work_dir/source/packaging/Dockerfile" \
     --target "$export_target" \
     --build-arg "BASE_VERSION=$base_version" \
@@ -94,6 +120,7 @@ build_flatpak() {
   local flatpak_arch
   local bundle
   local repo="$output_root/flatpak/repo"
+  local -a state_args=()
 
   if ! flatpak info org.flatpak.Builder >/dev/null 2>&1 ||
      ! command -v flatpak >/dev/null 2>&1; then
@@ -105,11 +132,17 @@ build_flatpak() {
   mkdir -p "$output_root/flatpak"
   bundle="$output_root/flatpak/ptyxis-${base_version}+${snapshot}-${flatpak_arch}.flatpak"
 
+  if [[ -n "$flatpak_builder_state_dir" ]]; then
+    mkdir -p "$flatpak_builder_state_dir"
+    state_args+=(--state-dir="$flatpak_builder_state_dir")
+  fi
+
   flatpak run org.flatpak.Builder \
     --user \
     --force-clean \
     --install-deps-from=flathub \
     --repo="$repo" \
+    "${state_args[@]}" \
     "$work_dir/flatpak-build" \
     "$work_dir/source/packaging/flatpak/org.gnome.Ptyxis.json"
   flatpak build-bundle \

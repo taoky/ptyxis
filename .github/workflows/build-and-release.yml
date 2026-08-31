@@ -28,7 +28,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build and test the Fedora package
+        env:
+          CONTAINER_ENGINE: docker
+          CONTAINER_CACHE: gha
         run: ./packaging/build-packages.sh fedora
 
   native-packages:
@@ -49,7 +55,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build and test package
+        env:
+          CONTAINER_ENGINE: docker
+          CONTAINER_CACHE: gha
         run: ./packaging/build-packages.sh "${{ matrix.target }}"
 
       - name: Upload package
@@ -69,6 +81,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Restore Flatpak cache
+        id: flatpak-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.local/share/flatpak
+            dist/flatpak-builder-state
+          key: flatpak-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/flatpak/org.gnome.Ptyxis.json') }}-${{ github.run_id }}
+          restore-keys: |
+            flatpak-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packaging/flatpak/org.gnome.Ptyxis.json') }}-
+
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
@@ -76,9 +99,20 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user --noninteractive flathub org.flatpak.Builder
+          flatpak update --user --noninteractive org.flatpak.Builder
 
       - name: Build Flatpak bundle
+        env:
+          FLATPAK_BUILDER_STATE_DIR: ${{ github.workspace }}/dist/flatpak-builder-state
         run: dbus-launch ./packaging/build-packages.sh flatpak
+
+      - name: Save Flatpak cache
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.local/share/flatpak
+            dist/flatpak-builder-state
+          key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
 
       - name: Upload Flatpak bundle
         uses: actions/upload-artifact@v7
