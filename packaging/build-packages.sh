@@ -106,6 +106,7 @@ build_flatpak() {
   bundle="$output_root/flatpak/ptyxis-${base_version}+${snapshot}-${flatpak_arch}.flatpak"
 
   flatpak-builder \
+    --user \
     --force-clean \
     --install-deps-from=flathub \
     --repo="$repo" \
