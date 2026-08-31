@@ -207,6 +207,12 @@ key_pressed_cb (PtyxisTerminalPicker *self,
   guint n_items = g_list_model_get_n_items (G_LIST_MODEL (self->visible));
   guint selected = gtk_single_selection_get_selected (self->selection);
 
+  if (keyval == GDK_KEY_Escape)
+    {
+      adw_dialog_close (ADW_DIALOG (self));
+      return TRUE;
+    }
+
   if (n_items > 0 && (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up))
     {
       if (selected == GTK_INVALID_LIST_POSITION)
