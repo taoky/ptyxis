@@ -61,6 +61,7 @@ check_early_opts (int        *argc,
 
       if (g_str_equal (arg, "--tab") ||
           g_str_equal (arg , "--new-window") ||
+          g_str_equal (arg, "--toggle-quake") ||
           (g_str_equal (arg, "--tab-with-profile") || g_str_has_prefix (arg, "--tab-with-profile=")))
         ignore_standalone = TRUE;
 

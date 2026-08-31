@@ -91,6 +91,7 @@ struct _PtyxisWindow
   guint                  tab_overview_animating : 1;
   guint                  disposed : 1;
   guint                  single_terminal_mode : 1;
+  guint                  quake_mode : 1;
   guint                  is_maximized : 1;
   guint                  is_fullscreen : 1;
   guint                  in_close_request : 1;
@@ -114,6 +115,9 @@ ptyxis_window_save_size (PtyxisWindow *self)
   PtyxisTab *active_tab;
 
   g_assert (PTYXIS_IS_WINDOW (self));
+
+  if (self->quake_mode)
+    return;
 
   if ((active_tab = ptyxis_window_get_active_tab (self)))
     {
@@ -454,7 +458,7 @@ update_visible_and_maybe_close (PtyxisWindow *self)
 
   if (n_pages == 0 && !adw_tab_view_get_is_transferring_page (self->tab_view))
     {
-      if (!self->in_close_request)
+      if (!self->in_close_request && !self->quake_mode)
         ptyxis_application_save_session (PTYXIS_APPLICATION_DEFAULT);
       gtk_window_destroy (GTK_WINDOW (self));
       return;
@@ -1444,7 +1448,9 @@ is_last_window (PtyxisWindow *self)
        iter;
        iter = iter->next)
     {
-      if (PTYXIS_IS_WINDOW (iter->data) && iter->data != (gpointer)self)
+      if (PTYXIS_IS_WINDOW (iter->data) &&
+          !ptyxis_window_get_quake_mode (iter->data) &&
+          iter->data != (gpointer)self)
         return FALSE;
     }
 
@@ -1463,7 +1469,7 @@ ptyxis_window_close_request (GtkWindow *window)
 
   ptyxis_window_save_size (self);
 
-  if (!self->single_terminal_mode && is_last_window (self))
+  if (!self->single_terminal_mode && !self->quake_mode && is_last_window (self))
     ptyxis_application_save_session (PTYXIS_APPLICATION_DEFAULT);
 
   /* Short-circuit if user dismissed guard rails */
@@ -2805,4 +2811,21 @@ ptyxis_window_get_single_terminal_mode (PtyxisWindow *self)
 {
   g_return_val_if_fail (PTYXIS_IS_WINDOW (self), FALSE);
   return self->single_terminal_mode;
+}
+
+gboolean
+ptyxis_window_get_quake_mode (PtyxisWindow *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_WINDOW (self), FALSE);
+
+  return self->quake_mode;
+}
+
+void
+ptyxis_window_set_quake_mode (PtyxisWindow *self,
+                              gboolean      quake_mode)
+{
+  g_return_if_fail (PTYXIS_IS_WINDOW (self));
+
+  self->quake_mode = !!quake_mode;
 }

@@ -107,6 +107,11 @@ Maximize a newly created window.
 Fullscreen a newly created window.
 
 .TP
+.BR \-\-toggle\-quake
+Show or hide a persistent Quake-style terminal window. This command is
+intended to be bound to a global shortcut provided by the desktop environment.
+
+.TP
 .BR \-\-tab\-with\-profile=PROFILE
 Creates a new tab in an existing instance using the specified
 profile. The profile should be a

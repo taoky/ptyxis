@@ -60,6 +60,9 @@ gboolean       ptyxis_window_focus_pane_by_uuid  (PtyxisWindow       *self,
                                                   const char         *pane_uuid);
 gboolean       ptyxis_window_is_animating        (PtyxisWindow       *self);
 gboolean       ptyxis_window_get_single_terminal_mode (PtyxisWindow   *self);
+gboolean       ptyxis_window_get_quake_mode       (PtyxisWindow       *self);
+void           ptyxis_window_set_quake_mode       (PtyxisWindow       *self,
+                                                   gboolean            quake_mode);
 void           ptyxis_window_set_tab_pinned      (PtyxisWindow       *self,
                                                   PtyxisTab          *tab,
                                                   gboolean            pinned);

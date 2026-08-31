@@ -51,6 +51,7 @@ struct _PtyxisApplication
   char                *system_font_name;
   GDBusProxy          *portal;
   PtyxisClient        *client;
+  PtyxisWindow        *quake_window;
   GHashTable          *exited;
   GVariant            *session;
   GFileMonitor        *xdg_terminals_list_monitor;
@@ -233,7 +234,8 @@ ptyxis_application_open (GApplication  *app,
            windows != NULL;
            windows = windows->next)
         {
-          if (PTYXIS_IS_WINDOW (windows->data))
+          if (PTYXIS_IS_WINDOW (windows->data) &&
+              !ptyxis_window_get_quake_mode (windows->data))
             {
               window = windows->data;
               break;
@@ -350,7 +352,8 @@ ptyxis_application_activate (GApplication *app)
        windows != NULL;
        windows = windows->next)
     {
-      if (PTYXIS_IS_WINDOW (windows->data))
+      if (PTYXIS_IS_WINDOW (windows->data) &&
+          !ptyxis_window_get_quake_mode (windows->data))
         {
           gtk_window_present (windows->data);
           return;
@@ -380,18 +383,48 @@ get_current_window (PtyxisApplication *self)
   g_assert (PTYXIS_IS_APPLICATION (self));
 
   if ((active_window = gtk_application_get_active_window (GTK_APPLICATION (self))) &&
-      PTYXIS_IS_WINDOW (active_window))
+      PTYXIS_IS_WINDOW (active_window) &&
+      !ptyxis_window_get_quake_mode (PTYXIS_WINDOW (active_window)))
     return PTYXIS_WINDOW (active_window);
 
   for (const GList *iter = gtk_application_get_windows (GTK_APPLICATION (self));
        iter != NULL;
        iter = iter->next)
     {
-      if (PTYXIS_IS_WINDOW (iter->data))
+      if (PTYXIS_IS_WINDOW (iter->data) &&
+          !ptyxis_window_get_quake_mode (iter->data))
         return PTYXIS_WINDOW (iter->data);
     }
 
   return NULL;
+}
+
+static void
+ptyxis_application_toggle_quake (PtyxisApplication *self)
+{
+  g_assert (PTYXIS_IS_APPLICATION (self));
+
+  if (self->quake_window == NULL)
+    {
+      self->quake_window = ptyxis_window_new ();
+      ptyxis_window_set_quake_mode (self->quake_window, TRUE);
+      g_object_add_weak_pointer (G_OBJECT (self->quake_window),
+                                 (gpointer *)&self->quake_window);
+    }
+
+  if (gtk_widget_get_visible (GTK_WIDGET (self->quake_window)))
+    {
+      gtk_widget_set_visible (GTK_WIDGET (self->quake_window), FALSE);
+    }
+  else
+    {
+      PtyxisTab *tab = ptyxis_window_get_active_tab (self->quake_window);
+
+      gtk_window_present (GTK_WINDOW (self->quake_window));
+
+      if (tab != NULL)
+        ptyxis_tab_grab_focus (tab);
+    }
 }
 
 static void
@@ -431,6 +464,7 @@ ptyxis_application_command_line (GApplication            *app,
   gboolean did_restore = FALSE;
   gboolean fullscreen = FALSE;
   gboolean maximize = FALSE;
+  gboolean toggle_quake = FALSE;
   int argc;
 
   g_assert (PTYXIS_IS_APPLICATION (self));
@@ -471,6 +505,9 @@ ptyxis_application_command_line (GApplication            *app,
   if (!g_variant_dict_lookup (dict, "new-window", "b", &new_window))
     new_window = FALSE;
 
+  if (!g_variant_dict_lookup (dict, "toggle-quake", "b", &toggle_quake))
+    toggle_quake = FALSE;
+
   if (!g_variant_dict_lookup (dict, "title", "s", &title))
     title = NULL;
 
@@ -480,6 +517,29 @@ ptyxis_application_command_line (GApplication            *app,
                                            "%s\n",
                                            _("--tab, --tab-with-profile, or --new-window may not be used together"));
       return EXIT_FAILURE;
+    }
+
+  if (toggle_quake)
+    {
+      if (is_standalone (self) ||
+          new_tab ||
+          new_tab_with_profile != NULL ||
+          new_window ||
+          g_variant_dict_contains (dict, "execute") ||
+          g_variant_dict_contains (dict, "preferences") ||
+          g_variant_dict_contains (dict, "working-directory") ||
+          g_variant_dict_contains (dict, "title") ||
+          maximize ||
+          fullscreen)
+        {
+          g_application_command_line_printerr (cmdline,
+                                               "%s\n",
+                                               _("--toggle-quake may not be combined with other options"));
+          return EXIT_FAILURE;
+        }
+
+      ptyxis_application_toggle_quake (self);
+      return EXIT_SUCCESS;
     }
 
   if (!g_variant_dict_lookup (dict, "working-directory", "^ay", &working_directory))
@@ -1056,6 +1116,10 @@ ptyxis_application_finalize (GObject *object)
   g_clear_object (&self->settings);
   g_clear_object (&self->client);
 
+  if (self->quake_window != NULL)
+    g_object_remove_weak_pointer (G_OBJECT (self->quake_window),
+                                  (gpointer *)&self->quake_window);
+
   g_clear_pointer (&self->next_title_prefix, g_free);
   g_clear_pointer (&self->exited, g_hash_table_unref);
   g_clear_pointer (&self->system_font_name, g_free);
@@ -1175,6 +1239,7 @@ ptyxis_application_init (PtyxisApplication *self)
      * checking from `main.c`.
      */
     { "new-window", 0, 0, G_OPTION_ARG_NONE, NULL, N_("New terminal window") },
+    { "toggle-quake", 0, 0, G_OPTION_ARG_NONE, NULL, N_("Show or hide the Quake terminal window") },
     { "tab", 0, 0, G_OPTION_ARG_NONE, NULL, N_("New terminal tab in active window") },
     { "tab-with-profile", 0, 0, G_OPTION_ARG_STRING, NULL, N_("New terminal tab in active window using the profile UUID"), N_("PROFILE_UUID") },
 

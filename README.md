@@ -205,6 +205,8 @@ in an existing terminal (if installed to your PATH).
 - `--version`: Show the program version.
 - `--preferences`: Open the preferences window directly.
 - `--new-window`: Open a new Ptyxis window.
+- `--toggle-quake`: Show or hide a persistent Quake-style terminal window.
+  Bind this command to a global shortcut in your desktop environment.
 - `--tab`: Open a new tab in the most-recently-used window.
 - `--tab-with-profile=PROFILE_UUID`: Open a new tab using the specified
   profile UUID. (UUIDs can be copied from `Preferences -> Profiles`).

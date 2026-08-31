@@ -50,7 +50,8 @@ ptyxis_session_save (PtyxisApplication *app)
        list != NULL;
        list = list->next)
     {
-      if (PTYXIS_IS_WINDOW (list->data))
+      if (PTYXIS_IS_WINDOW (list->data) &&
+          !ptyxis_window_get_quake_mode (list->data))
         {
           PtyxisWindow *window = PTYXIS_WINDOW (list->data);
           g_autoptr(GListModel) pages = ptyxis_window_list_pages (window);
