@@ -56,6 +56,7 @@ enum {
   PROP_DEFAULT_ROWS,
   PROP_SCROLLBAR_POLICY,
   PROP_SELECT_TO_COPY,
+  PROP_TRIM_TRAILING_SPACES,
   PROP_TAB_MIDDLE_CLICK,
   PROP_TEXT_BLINK_MODE,
   PROP_TOAST_ON_COPY_CLIPBOARD,
@@ -126,6 +127,8 @@ ptyxis_settings_changed_cb (PtyxisSettings *self,
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_INHIBIT_LOGOUT]);
   else if (g_str_equal (key, PTYXIS_SETTING_KEY_SELECT_TO_COPY))
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SELECT_TO_COPY]);
+  else if (g_str_equal (key, PTYXIS_SETTING_KEY_TRIM_TRAILING_SPACES))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TRIM_TRAILING_SPACES]);
   else if (g_str_equal (key, PTYXIS_SETTING_KEY_FONT_NAME))
     {
       g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_FONT_NAME]);
@@ -194,6 +197,10 @@ ptyxis_settings_get_property (GObject    *object,
     
     case PROP_SELECT_TO_COPY:
       g_value_set_boolean (value, ptyxis_settings_get_select_to_copy (self));
+      break;
+
+    case PROP_TRIM_TRAILING_SPACES:
+      g_value_set_boolean (value, ptyxis_settings_get_trim_trailing_spaces (self));
       break;
 
     case PROP_FONT_DESC:
@@ -309,6 +316,10 @@ ptyxis_settings_set_property (GObject      *object,
     
     case PROP_SELECT_TO_COPY:
       ptyxis_settings_set_select_to_copy (self, g_value_get_boolean (value));
+      break;
+
+    case PROP_TRIM_TRAILING_SPACES:
+      ptyxis_settings_set_trim_trailing_spaces (self, g_value_get_boolean (value));
       break;
 
     case PROP_FONT_NAME:
@@ -442,6 +453,13 @@ ptyxis_settings_class_init (PtyxisSettingsClass *klass)
   
   properties[PROP_SELECT_TO_COPY] =
     g_param_spec_boolean (PTYXIS_SETTING_KEY_SELECT_TO_COPY, NULL, NULL,
+                          FALSE,
+                          (G_PARAM_READWRITE |
+                           G_PARAM_EXPLICIT_NOTIFY |
+                           G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_TRIM_TRAILING_SPACES] =
+    g_param_spec_boolean (PTYXIS_SETTING_KEY_TRIM_TRAILING_SPACES, NULL, NULL,
                           FALSE,
                           (G_PARAM_READWRITE |
                            G_PARAM_EXPLICIT_NOTIFY |
@@ -1254,4 +1272,24 @@ ptyxis_settings_get_select_to_copy (PtyxisSettings *self)
 
   return g_settings_get_boolean (self->settings,
                                  PTYXIS_SETTING_KEY_SELECT_TO_COPY);
+}
+
+void
+ptyxis_settings_set_trim_trailing_spaces (PtyxisSettings *self,
+                                          gboolean        trim_trailing_spaces)
+{
+  g_return_if_fail (PTYXIS_IS_SETTINGS (self));
+
+  g_settings_set_boolean (self->settings,
+                          PTYXIS_SETTING_KEY_TRIM_TRAILING_SPACES,
+                          !!trim_trailing_spaces);
+}
+
+gboolean
+ptyxis_settings_get_trim_trailing_spaces (PtyxisSettings *self)
+{
+  g_return_val_if_fail (PTYXIS_IS_SETTINGS (self), FALSE);
+
+  return g_settings_get_boolean (self->settings,
+                                 PTYXIS_SETTING_KEY_TRIM_TRAILING_SPACES);
 }

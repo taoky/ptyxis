@@ -196,6 +196,12 @@
       <description>Immediately copy text to clipboard when selected</description>
     </key>
 
+    <key name="trim-trailing-spaces-on-copy" type="b">
+      <default>false</default>
+      <summary>Trim Trailing Spaces on Copy</summary>
+      <description>Remove trailing spaces from each line when copying plain text</description>
+    </key>
+
     <key name="restore-window-size" type="b">
       <default>true</default>
       <summary>Restore Window Size</summary>

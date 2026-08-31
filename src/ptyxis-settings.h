@@ -53,6 +53,7 @@ G_BEGIN_DECLS
 #define PTYXIS_SETTING_KEY_IGNORE_OSC_TITLE        "ignore-osc-title"
 #define PTYXIS_SETTING_KEY_INHIBIT_LOGOUT          "inhibit-logout"
 #define PTYXIS_SETTING_KEY_SELECT_TO_COPY          "select-to-copy"
+#define PTYXIS_SETTING_KEY_TRIM_TRAILING_SPACES    "trim-trailing-spaces-on-copy"
 
 typedef enum _PtyxisNewTabPosition
 {
@@ -181,5 +182,8 @@ void                    ptyxis_settings_set_inhibit_logout          (PtyxisSetti
 gboolean                ptyxis_settings_get_select_to_copy          (PtyxisSettings             *self);
 void                    ptyxis_settings_set_select_to_copy          (PtyxisSettings             *self,
                                                                      gboolean                    select_to_copy);
+gboolean                ptyxis_settings_get_trim_trailing_spaces    (PtyxisSettings             *self);
+void                    ptyxis_settings_set_trim_trailing_spaces    (PtyxisSettings             *self,
+                                                                     gboolean                    trim_trailing_spaces);
 
 G_END_DECLS

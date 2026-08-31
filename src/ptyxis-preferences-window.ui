@@ -651,6 +651,12 @@
                 <property name="subtitle" translatable="yes">Immediately copy text to clipboard when selected</property>
               </object>
             </child>
+            <child>
+              <object class="AdwSwitchRow" id="trim_trailing_spaces">
+                <property name="title" translatable="yes">Trim trailing spaces when copying</property>
+                <property name="subtitle" translatable="yes">Remove spaces at the end of each line when copying plain text</property>
+              </object>
+            </child>
           </object>
         </child>
         <child>

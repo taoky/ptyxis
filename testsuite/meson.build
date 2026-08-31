@@ -49,3 +49,11 @@ terminal_picker_test = executable('test-terminal-picker',
   include_directories: [include_directories('../src')],
 )
 test('test-terminal-picker', terminal_picker_test, env: test_env)
+
+terminal_copy_test = executable('test-terminal-copy',
+  ['test-terminal-copy.c', '../src/ptyxis-terminal-copy.c'],
+  c_args: testsuite_c_args,
+  dependencies: dependency('glib-2.0'),
+  include_directories: [include_directories('..'), include_directories('../src')],
+)
+test('test-terminal-copy', terminal_copy_test, env: test_env)

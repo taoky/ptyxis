@@ -36,6 +36,7 @@
 #include "ptyxis-shortcuts.h"
 #include "ptyxis-tab.h"
 #include "ptyxis-terminal.h"
+#include "ptyxis-terminal-copy.h"
 #include "ptyxis-util.h"
 #include "ptyxis-window.h"
 
@@ -424,6 +425,8 @@ copy_clipboard_action (GtkWidget  *widget,
   PtyxisTerminal *self = PTYXIS_TERMINAL (widget);
   GdkClipboard *clipboard = gtk_widget_get_clipboard (widget);
   g_autofree char *text = NULL;
+  g_autofree char *trimmed_text = NULL;
+  const char *clipboard_text;
   VteFormat format = VTE_FORMAT_TEXT;
   gboolean is_select_to_copy = g_strcmp0 (action_name, "clipboard.copy-by-select") == 0;
 
@@ -436,7 +439,16 @@ copy_clipboard_action (GtkWidget  *widget,
     {
       PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
 
-      gdk_clipboard_set_text (clipboard, text);
+      clipboard_text = text;
+
+      if (format == VTE_FORMAT_TEXT &&
+          ptyxis_settings_get_trim_trailing_spaces (settings))
+        {
+          trimmed_text = ptyxis_terminal_copy_trim_trailing_spaces (text);
+          clipboard_text = trimmed_text;
+        }
+
+      gdk_clipboard_set_text (clipboard, clipboard_text);
 
       if (ptyxis_settings_get_toast_on_copy_clipboard (settings) && !is_select_to_copy)
         ptyxis_terminal_toast (self, 1, _("Copied to clipboard"));

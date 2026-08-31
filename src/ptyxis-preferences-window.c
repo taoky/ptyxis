@@ -146,6 +146,7 @@ struct _PtyxisPreferencesWindow
   AdwSwitchRow         *visual_bell;
   GtkListBox           *custom_links_list_box;
   AdwSwitchRow         *select_to_copy;
+  AdwSwitchRow         *trim_trailing_spaces;
 };
 
 G_DEFINE_FINAL_TYPE (PtyxisPreferencesWindow, ptyxis_preferences_window, ADW_TYPE_PREFERENCES_WINDOW)
@@ -913,6 +914,9 @@ ptyxis_preferences_window_constructed (GObject *object)
   g_object_bind_property (settings, "select-to-copy",
                           self->select_to_copy, "active",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+  g_object_bind_property (settings, "trim-trailing-spaces-on-copy",
+                          self->trim_trailing_spaces, "active",
+                          G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
 
   g_object_bind_property (settings, "default-columns",
                           self->default_columns, "value",
@@ -1261,6 +1265,7 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, use_system_font);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, visual_bell);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, select_to_copy);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, trim_trailing_spaces);
 
   gtk_widget_class_bind_template_callback (widget_class, ptyxis_preferences_window_profile_row_activated_cb);
   gtk_widget_class_bind_template_callback (widget_class, ptyxis_preferences_window_show_all_cb);
