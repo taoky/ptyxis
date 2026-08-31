@@ -232,7 +232,6 @@
     <file>palettes/Soft Server.palette</file>
     <file>palettes/Solarized Darcula.palette</file>
     <file>palettes/Solarized Dark Higher Contrast.palette</file>
-    <file>palettes/Solarized.palette</file>
     <file>palettes/Sonokai.palette</file>
     <file>palettes/Spacedust.palette</file>
     <file>palettes/Spacegray Eighties Dull.palette</file>
@@ -284,4 +283,3 @@
     <file>palettes/Zenburn.palette</file>
   </gresource>
 </gresources>
-
