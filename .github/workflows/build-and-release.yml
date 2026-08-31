@@ -1,0 +1,121 @@
+name: Build and release packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_native:
+        description: Build Debian, Ubuntu, Fedora, and Arch packages
+        type: boolean
+        default: true
+      build_flatpak:
+        description: Build the Flatpak bundle
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-check:
+    name: Build check (Fedora 44)
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Build and test the Fedora package
+        run: ./packaging/build-packages.sh fedora
+
+  native-packages:
+    name: Package (${{ matrix.target }})
+    if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.build_native) }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - debian
+          - ubuntu
+          - fedora
+          - arch
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Build and test package
+        run: ./packaging/build-packages.sh "${{ matrix.target }}"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/**/*
+          if-no-files-found: error
+
+  flatpak-package:
+    name: Package (Flatpak)
+    if: ${{ startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.build_flatpak) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Flatpak bundle
+        run: ./packaging/build-packages.sh flatpak
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-flatpak
+          path: dist/flatpak/*.flatpak
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs:
+      - native-packages
+      - flatpak-package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: package-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' assets < <(find release-assets -type f -print0)
+          if (( ${#assets[@]} == 0 )); then
+            echo "No release assets were downloaded." >&2
+            exit 1
+          fi
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --generate-notes \
+              --title "$GITHUB_REF_NAME"
+          fi
+          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
