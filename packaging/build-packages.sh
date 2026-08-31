@@ -95,9 +95,9 @@ build_flatpak() {
   local bundle
   local repo="$output_root/flatpak/repo"
 
-  if ! command -v flatpak-builder >/dev/null 2>&1 ||
+  if ! flatpak info org.flatpak.Builder >/dev/null 2>&1 ||
      ! command -v flatpak >/dev/null 2>&1; then
-    echo "flatpak and flatpak-builder are required for the Flatpak bundle." >&2
+    echo "flatpak and org.flatpak.Builder are required for the Flatpak bundle." >&2
     exit 1
   fi
 
@@ -105,7 +105,7 @@ build_flatpak() {
   mkdir -p "$output_root/flatpak"
   bundle="$output_root/flatpak/ptyxis-${base_version}+${snapshot}-${flatpak_arch}.flatpak"
 
-  flatpak-builder \
+  flatpak run org.flatpak.Builder \
     --user \
     --force-clean \
     --install-deps-from=flathub \

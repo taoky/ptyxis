@@ -72,9 +72,10 @@ jobs:
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes flatpak flatpak-builder
+          sudo apt-get install --yes flatpak
           flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub org.flatpak.Builder
 
       - name: Build Flatpak bundle
         run: ./packaging/build-packages.sh flatpak
