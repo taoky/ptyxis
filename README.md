@@ -5,6 +5,10 @@
 [![Distribution: Flatpak (Stable)](https://img.shields.io/badge/Available%20on-Flatpak%20(Stable)-4d9c9a.svg?logo=flatpak&logoColor=white)](https://flathub.org/apps/app.devsuite.Ptyxis)
 [![Distribution: Flatpak (Nightly)](https://img.shields.io/badge/Available%20on-Flatpak%20(Nightly)-4d9c9a.svg?logo=flatpak&logoColor=white)](https://gitlab.gnome.org/chergert/ptyxis#flatpak-recommended)
 
+> [!IMPORTANT]
+> 1. This is a forked version only inteneded to be used by myself. For reporting issues or feature requests with original Ptyxis (usually packaged by your distro), please see [upstream Ptyxis](https://gitlab.gnome.org/chergert/ptyxis) first.
+> 2. This fork heavily uses LLM to assist development. DO NOT use this fork if you mind this.
+
 # Ptyxis: Your Container-Oriented Terminal for GNOME
 
 **A modern terminal emulator built for the container era.**
