@@ -72,13 +72,13 @@ jobs:
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update
-          sudo apt-get install --yes flatpak
+          sudo apt-get install --yes flatpak dbus-x11
           flatpak remote-add --user --if-not-exists flathub \
             https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user --noninteractive flathub org.flatpak.Builder
 
       - name: Build Flatpak bundle
-        run: ./packaging/build-packages.sh flatpak
+        run: dbus-launch ./packaging/build-packages.sh flatpak
 
       - name: Upload Flatpak bundle
         uses: actions/upload-artifact@v7
