@@ -15,6 +15,32 @@
 
 一个习惯了但上游[暂时不想实现](https://gitlab.gnome.org/chergert/ptyxis/-/work_items/276)的特性。
 
+## 可选的 fish shell integration
+
+Ptyxis 依靠 VTE shell integration 判断交互式命令何时开始和结束。VTE 目前为 bash 和
+zsh 安装了相应集成，但没有覆盖 fish；因此 fish 会话默认不会触发 Ptyxis 的命令
+完成通知。
+
+此 fork 在 [`contrib/fish/ptyxis-vte.fish`](contrib/fish/ptyxis-vte.fish)
+提供了一个可选脚本，但 Ptyxis 不会安装它。若要为当前用户启用，可以将其复制到
+fish 配置目录：
+
+```sh
+mkdir -p ~/.config/fish/conf.d
+cp contrib/fish/ptyxis-vte.fish ~/.config/fish/conf.d/
+```
+
+若仓库检出路径长期不变，也可以创建软链接：
+
+```sh
+mkdir -p ~/.config/fish/conf.d
+ln -s "$(pwd)/contrib/fish/ptyxis-vte.fish" ~/.config/fish/conf.d/ptyxis-vte.fish
+```
+
+脚本仅在 VTE 0.78 或更新版本下的交互式 fish 中启用。它使用 fish 的
+`fish_preexec` 和 `fish_postexec` 事件，不会替换或包装用户的 prompt。在容器或
+远程主机中启动 fish 时，需要在相应环境中另行放置该脚本。
+
 ## 终端 pane 与分屏
 
 此 fork 最大的修改是在一个标签页中支持多个终端 pane。

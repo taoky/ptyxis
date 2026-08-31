@@ -17,6 +17,35 @@
 
 A feature I like, but [temporarily denied by upstream](https://gitlab.gnome.org/chergert/ptyxis/-/work_items/276) as title suggests.
 
+## Optional fish shell integration
+
+Ptyxis relies on VTE shell integration to detect when an interactive command
+starts and finishes. VTE currently installs this integration for bash and zsh,
+but not for fish. Without it, fish sessions do not produce Ptyxis's
+command-completed notifications.
+
+This fork provides an optional fish integration script at
+[`contrib/fish/ptyxis-vte.fish`](contrib/fish/ptyxis-vte.fish). It is not
+installed by Ptyxis. To enable it for the current user, either copy it into
+fish's configuration directory:
+
+```sh
+mkdir -p ~/.config/fish/conf.d
+cp contrib/fish/ptyxis-vte.fish ~/.config/fish/conf.d/
+```
+
+or create a symlink while working from a persistent checkout:
+
+```sh
+mkdir -p ~/.config/fish/conf.d
+ln -s "$(pwd)/contrib/fish/ptyxis-vte.fish" ~/.config/fish/conf.d/ptyxis-vte.fish
+```
+
+The script only activates in an interactive fish running under VTE 0.78 or
+newer. It uses fish's `fish_preexec` and `fish_postexec` events and does not
+replace or wrap the user's prompt. Containers and remote hosts need their own
+copy if fish is started there.
+
 ## Terminal panes and splitting
 
 The largest change is support for multiple terminal panes inside one tab.
