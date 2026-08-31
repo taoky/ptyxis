@@ -46,6 +46,17 @@ newer. It uses fish's `fish_preexec` and `fish_postexec` events and does not
 replace or wrap the user's prompt. Containers and remote hosts need their own
 copy if fish is started there.
 
+## Background bell notifications
+
+When a terminal bell comes from a background tab or pane, or while its Ptyxis
+window is inactive, the fork sends a desktop notification in addition to
+marking the tab as needing attention. Repeated bells from the same pane replace
+the existing notification. Activating it returns to the originating window,
+tab, and exact pane; focusing or closing that pane withdraws the notification.
+
+A bell from the visible pane of the active window keeps the existing audible
+and visual bell behavior and does not create a redundant desktop notification.
+
 ## Terminal panes and splitting
 
 The largest change is support for multiple terminal panes inside one tab.

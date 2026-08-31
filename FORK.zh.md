@@ -41,6 +41,16 @@ ln -s "$(pwd)/contrib/fish/ptyxis-vte.fish" ~/.config/fish/conf.d/ptyxis-vte.fis
 `fish_preexec` 和 `fish_postexec` 事件，不会替换或包装用户的 prompt。在容器或
 远程主机中启动 fish 时，需要在相应环境中另行放置该脚本。
 
+## 后台 bell 通知
+
+当终端 bell 来自后台标签页或 pane，或其 Ptyxis 窗口处于非活动状态时，此 fork 除了
+把标签页标记为需要注意，还会发送桌面通知。同一 pane 重复发出的 bell 会更新已有
+通知而不会不断堆叠。激活通知会回到来源窗口、标签页和准确的 pane；聚焦或关闭该
+pane 时会撤回通知。
+
+活动窗口中当前可见 pane 发出的 bell 保持原有声音和视觉反馈，不会额外创建重复的
+桌面通知。
+
 ## 终端 pane 与分屏
 
 此 fork 最大的修改是在一个标签页中支持多个终端 pane。

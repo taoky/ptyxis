@@ -259,10 +259,16 @@ static void
 ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
                                   PtyxisPane *pane)
 {
+  g_autofree char *notification_id = NULL;
+
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_PANE (pane));
 
   ptyxis_tab_set_active_pane (self, pane);
+  ptyxis_tab_set_needs_attention (self, FALSE);
+  notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
+  g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
+                                       notification_id);
 }
 
 static void
@@ -1086,6 +1092,7 @@ static void
 ptyxis_tab_remove_pane (PtyxisTab  *self,
                         PtyxisPane *pane)
 {
+  g_autofree char *notification_id = NULL;
   PtyxisSplitNode *leaf;
   PtyxisSplitNode *next;
   GtkPaned *paned;
@@ -1095,6 +1102,9 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
 
   leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane));
   g_return_if_fail (leaf != NULL && ptyxis_split_node_get_parent (leaf) != NULL);
+  notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
+  g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
+                                       notification_id);
   next = ptyxis_split_node_get_next_leaf (self->split_root, leaf, FALSE);
   if (next == NULL)
     next = ptyxis_split_node_get_previous_leaf (self->split_root, leaf, FALSE);
@@ -1295,13 +1305,55 @@ static void
 ptyxis_tab_bell_cb (PtyxisTab      *self,
                     PtyxisTerminal *terminal)
 {
+  g_autoptr(GNotification) notification = NULL;
+  g_autoptr(GIcon) icon = NULL;
+  g_autofree char *notification_id = NULL;
+  g_autofree char *title = NULL;
+  PtyxisPane *pane = NULL;
+  GtkRoot *root;
+
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_TERMINAL (terminal));
 
-  if (terminal == self->terminal && ptyxis_tab_is_active (self))
-    g_signal_emit (self, signals[BELL], 0);
-  else
-    ptyxis_tab_set_needs_attention (self, TRUE);
+  for (guint i = 0; i < ptyxis_tab_get_n_panes (self); i++)
+    {
+      PtyxisPane *candidate = ptyxis_tab_get_pane (self, i);
+
+      if (ptyxis_pane_get_terminal (candidate) == terminal)
+        {
+          pane = candidate;
+          break;
+        }
+    }
+
+  g_return_if_fail (pane != NULL);
+
+  root = gtk_widget_get_root (GTK_WIDGET (self));
+  if (PTYXIS_IS_WINDOW (root) &&
+      gtk_window_is_active (GTK_WINDOW (root)) &&
+      terminal == self->terminal &&
+      ptyxis_tab_is_active (self))
+    {
+      g_signal_emit (self, signals[BELL], 0);
+      return;
+    }
+
+  ptyxis_tab_set_needs_attention (self, TRUE);
+
+  title = ptyxis_tab_dup_pane_title (self, pane);
+  notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
+  icon = g_themed_icon_new (APP_ID "-symbolic");
+  notification = g_notification_new (_("Bell received"));
+  g_notification_set_body (notification, title);
+  g_notification_set_icon (notification, icon);
+  g_notification_set_default_action_and_target (notification,
+                                                 "app.focus-pane-by-uuid",
+                                                 "(ss)",
+                                                 ptyxis_tab_get_uuid (self),
+                                                 ptyxis_pane_get_uuid (pane));
+  g_application_send_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
+                                   notification_id,
+                                   notification);
 }
 
 static PtyxisIpcContainer *
@@ -1719,6 +1771,16 @@ ptyxis_tab_dispose (GObject *object)
   g_debug ("Disposing tab");
 
   ptyxis_tab_notify_destroy (&self->notify);
+
+  for (guint i = 0; i < ptyxis_tab_get_n_panes (self); i++)
+    {
+      PtyxisPane *pane = ptyxis_tab_get_pane (self, i);
+      g_autofree char *notification_id =
+        g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
+
+      g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
+                                           notification_id);
+    }
 
   ptyxis_tab_force_quit (self);
 

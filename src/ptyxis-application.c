@@ -83,6 +83,9 @@ static void ptyxis_application_preferences       (GSimpleAction *action,
 static void ptyxis_application_focus_tab_by_uuid (GSimpleAction *action,
                                                   GVariant      *param,
                                                   gpointer       user_data);
+static void ptyxis_application_focus_pane_by_uuid_action (GSimpleAction *action,
+                                                          GVariant      *param,
+                                                          gpointer       user_data);
 static void ptyxis_application_apply_default_size(PtyxisApplication *self,
                                                   PtyxisTerminal    *terminal);
 
@@ -91,6 +94,7 @@ static GActionEntry action_entries[] = {
   { "edit-profile", ptyxis_application_edit_profile, "s" },
   { "preferences", ptyxis_application_preferences },
   { "focus-tab-by-uuid", ptyxis_application_focus_tab_by_uuid, "s" },
+  { "focus-pane-by-uuid", ptyxis_application_focus_pane_by_uuid_action, "(ss)" },
   { "new-window", ptyxis_application_new_window_action },
   { "new-tab", ptyxis_application_new_tab_action },
   { "make-default", ptyxis_application_make_default },
@@ -2176,6 +2180,23 @@ ptyxis_application_focus_tab_by_uuid (GSimpleAction *action,
             break;
         }
     }
+}
+
+static void
+ptyxis_application_focus_pane_by_uuid_action (GSimpleAction *action,
+                                              GVariant      *param,
+                                              gpointer       user_data)
+{
+  PtyxisApplication *self = user_data;
+  const char *tab_uuid;
+  const char *pane_uuid;
+
+  g_assert (PTYXIS_IS_APPLICATION (self));
+  g_assert (param != NULL);
+  g_assert (g_variant_is_of_type (param, G_VARIANT_TYPE ("(ss)")));
+
+  g_variant_get (param, "(&s&s)", &tab_uuid, &pane_uuid);
+  ptyxis_application_focus_pane_by_uuid (self, tab_uuid, pane_uuid);
 }
 
 /**
