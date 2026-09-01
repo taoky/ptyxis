@@ -8,6 +8,7 @@ output_root="$source_dir/dist"
 container_engine=${CONTAINER_ENGINE:-}
 container_cache=${CONTAINER_CACHE:-}
 flatpak_builder_state_dir=${FLATPAK_BUILDER_STATE_DIR:-}
+use_mirrorimage=${USE_MIRRORIMAGE:-""}
 
 usage() {
   echo "Usage: $0 {debian|ubuntu|fedora|arch|flatpak|all}" >&2
@@ -134,10 +135,16 @@ build_native() {
       ;;
   esac
 
+  if [[ -n $use_mirrorimage ]]; then
+    dockerfile="Dockerfile.ustclug"
+  else
+    dockerfile="Dockerfile"
+  fi
+
   mkdir -p "$output_dir"
   "${build_command[@]}" \
     "${cache_args[@]}" \
-    --file "$work_dir/source/packaging/Dockerfile" \
+    --file "$work_dir/source/packaging/$dockerfile" \
     --target "$export_target" \
     --build-arg "BASE_VERSION=$package_version" \
     --build-arg "DEBIAN_VERSION=$debian_version" \
