@@ -86,6 +86,8 @@ struct _PtyxisPreferencesWindow
   AdwSwitchRow         *quake_autostart;
   GtkButton            *quake_change_shortcut;
   AdwActionRow         *quake_shortcut;
+  AdwActionRow         *quake_service_status;
+  GtkButton            *quake_service_toggle;
   GtkSwitch            *restore_window_size;
   AdwSpinRow           *default_rows;
   AdwSpinRow           *default_columns;
@@ -153,6 +155,9 @@ struct _PtyxisPreferencesWindow
   AdwSwitchRow         *trim_trailing_spaces;
   GCancellable         *quake_autostart_cancellable;
   GCancellable         *quake_configure_cancellable;
+  GCancellable         *quake_stop_cancellable;
+  guint                 quake_daemon_watch_id;
+  guint                 quake_daemon_running : 1;
   guint                 updating_quake_autostart : 1;
 };
 
@@ -447,7 +452,9 @@ ptyxis_preferences_window_quake_configure_cb (GObject      *object,
                                       adw_toast_new (error->message));
 
   if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-    gtk_widget_set_sensitive (GTK_WIDGET (self->quake_change_shortcut), TRUE);
+    gtk_widget_set_sensitive (GTK_WIDGET (self->quake_change_shortcut),
+                              self->quake_daemon_running);
+  g_clear_object (&self->quake_configure_cancellable);
 }
 
 static void
@@ -464,6 +471,73 @@ ptyxis_preferences_window_quake_change_shortcut_cb (GtkButton               *but
     self->quake_configure_cancellable,
     ptyxis_preferences_window_quake_configure_cb,
     g_object_ref (self));
+}
+
+static void
+ptyxis_preferences_window_update_quake_service (PtyxisPreferencesWindow *self,
+                                                 gboolean                 running)
+{
+  self->quake_daemon_running = running;
+  adw_action_row_set_subtitle (self->quake_service_status,
+                               running ? _("Running") : _("Stopped"));
+  gtk_button_set_label (self->quake_service_toggle,
+                        running ? _("Stop") : _("Start"));
+  gtk_widget_set_sensitive (GTK_WIDGET (self->quake_service_toggle), TRUE);
+  gtk_widget_set_sensitive (GTK_WIDGET (self->quake_change_shortcut), running);
+}
+
+static void
+ptyxis_preferences_window_quake_daemon_appeared_cb (GDBusConnection *connection,
+                                                     const char      *name,
+                                                     const char      *name_owner,
+                                                     gpointer         user_data)
+{
+  ptyxis_preferences_window_update_quake_service (user_data, TRUE);
+}
+
+static void
+ptyxis_preferences_window_quake_daemon_vanished_cb (GDBusConnection *connection,
+                                                     const char      *name,
+                                                     gpointer         user_data)
+{
+  ptyxis_preferences_window_update_quake_service (user_data, FALSE);
+}
+
+static void
+ptyxis_preferences_window_quake_stop_cb (GObject      *object,
+                                          GAsyncResult *result,
+                                          gpointer      user_data)
+{
+  g_autoptr(PtyxisPreferencesWindow) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_stop_finish (result, &error) &&
+      !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+    {
+      adw_preferences_window_add_toast (ADW_PREFERENCES_WINDOW (self),
+                                        adw_toast_new (error->message));
+      gtk_widget_set_sensitive (GTK_WIDGET (self->quake_service_toggle), TRUE);
+    }
+
+  g_clear_object (&self->quake_stop_cancellable);
+}
+
+static void
+ptyxis_preferences_window_quake_service_toggle_cb (GtkButton               *button,
+                                                    PtyxisPreferencesWindow *self)
+{
+  if (!self->quake_daemon_running)
+    {
+      ptyxis_quake_service_start ();
+      return;
+    }
+
+  g_clear_object (&self->quake_stop_cancellable);
+  self->quake_stop_cancellable = g_cancellable_new ();
+  gtk_widget_set_sensitive (GTK_WIDGET (button), FALSE);
+  ptyxis_quake_service_stop_async (self->quake_stop_cancellable,
+                                   ptyxis_preferences_window_quake_stop_cb,
+                                   g_object_ref (self));
 }
 
 static void
@@ -1077,6 +1151,22 @@ ptyxis_preferences_window_constructed (GObject *object)
                     "clicked",
                     G_CALLBACK (ptyxis_preferences_window_quake_change_shortcut_cb),
                     self);
+  g_signal_connect (self->quake_service_toggle,
+                    "clicked",
+                    G_CALLBACK (ptyxis_preferences_window_quake_service_toggle_cb),
+                    self);
+  {
+    g_autofree char *daemon_id = g_strconcat (APP_ID, ".QuakeDaemon", NULL);
+
+    self->quake_daemon_watch_id =
+      g_bus_watch_name (G_BUS_TYPE_SESSION,
+                        daemon_id,
+                        G_BUS_NAME_WATCHER_FLAGS_NONE,
+                        ptyxis_preferences_window_quake_daemon_appeared_cb,
+                        ptyxis_preferences_window_quake_daemon_vanished_cb,
+                        self,
+                        NULL);
+  }
   g_signal_connect_object (gsettings,
                            "changed::" PTYXIS_QUAKE_SHORTCUT_DESCRIPTION_KEY,
                            G_CALLBACK (ptyxis_preferences_window_quake_shortcut_description_cb),
@@ -1271,8 +1361,16 @@ ptyxis_preferences_window_dispose (GObject *object)
     g_cancellable_cancel (self->quake_autostart_cancellable);
   if (self->quake_configure_cancellable != NULL)
     g_cancellable_cancel (self->quake_configure_cancellable);
+  if (self->quake_stop_cancellable != NULL)
+    g_cancellable_cancel (self->quake_stop_cancellable);
+  if (self->quake_daemon_watch_id != 0)
+    {
+      g_bus_unwatch_name (self->quake_daemon_watch_id);
+      self->quake_daemon_watch_id = 0;
+    }
   g_clear_object (&self->quake_autostart_cancellable);
   g_clear_object (&self->quake_configure_cancellable);
+  g_clear_object (&self->quake_stop_cancellable);
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_PREFERENCES_WINDOW);
 
   g_clear_pointer (&self->default_palette_id, g_free);
@@ -1379,6 +1477,8 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_autostart);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_change_shortcut);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_shortcut);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_service_status);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_service_toggle);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, restore_session);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, restore_window_size);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, default_rows);

@@ -399,6 +399,18 @@
           <object class="AdwPreferencesGroup">
             <property name="title" translatable="yes">Quake Mode</property>
             <child>
+              <object class="AdwActionRow" id="quake_service_status">
+                <property name="title" translatable="yes">Shortcut Service</property>
+                <property name="subtitle" translatable="yes">Stopped</property>
+                <child type="suffix">
+                  <object class="GtkButton" id="quake_service_toggle">
+                    <property name="label" translatable="yes">Start</property>
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
               <object class="AdwSwitchRow" id="quake_autostart">
                 <property name="title" translatable="yes">Start Shortcut Service at Login</property>
                 <property name="subtitle" translatable="yes">Keep the global Quake shortcut available before Ptyxis is opened</property>
@@ -411,6 +423,7 @@
                 <child type="suffix">
                   <object class="GtkButton" id="quake_change_shortcut">
                     <property name="label" translatable="yes">Change Shortcut…</property>
+                    <property name="sensitive">false</property>
                     <property name="valign">center</property>
                   </object>
                 </child>

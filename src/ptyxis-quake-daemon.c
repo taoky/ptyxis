@@ -12,6 +12,7 @@
 
 #define QUAKE_ACTION "toggle-quake"
 #define CONFIGURE_ACTION "configure-shortcut"
+#define QUIT_ACTION "quit"
 
 typedef struct
 {
@@ -138,6 +139,16 @@ configure_shortcut_cb (GSimpleAction *action,
   ptyxis_global_shortcuts_configure (self->shortcuts, "");
 }
 
+static void
+quit_cb (GSimpleAction *action,
+         GVariant      *parameter,
+         gpointer       user_data)
+{
+  QuakeDaemon *self = user_data;
+
+  g_application_quit (self->application);
+}
+
 int
 main (int   argc,
       char *argv[])
@@ -162,6 +173,12 @@ main (int   argc,
                       &self);
     g_action_map_add_action (G_ACTION_MAP (self.application),
                              G_ACTION (configure_action));
+    g_action_map_add_action_entries (G_ACTION_MAP (self.application),
+                                     (const GActionEntry[]) {
+                                       { QUIT_ACTION, quit_cb },
+                                     },
+                                     1,
+                                     &self);
   }
   g_signal_connect (self.application,
                     "activate",

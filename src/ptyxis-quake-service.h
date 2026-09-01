@@ -26,6 +26,11 @@ void     ptyxis_quake_service_configure_async       (GCancellable         *cance
                                                      gpointer              user_data);
 gboolean ptyxis_quake_service_configure_finish      (GAsyncResult         *result,
                                                      GError              **error);
+void     ptyxis_quake_service_stop_async            (GCancellable         *cancellable,
+                                                     GAsyncReadyCallback   callback,
+                                                     gpointer              user_data);
+gboolean ptyxis_quake_service_stop_finish           (GAsyncResult         *result,
+                                                     GError              **error);
 
 /* Exposed for focused tests; callers should normally use the async API. */
 gboolean _ptyxis_quake_service_set_native_autostart (const char           *template_path,

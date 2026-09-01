@@ -15,6 +15,7 @@
 #define QUAKE_DAEMON_PATH BINDIR "/ptyxis-quake-daemon"
 #define QUAKE_AUTOSTART_TEMPLATE PKGDATADIR "/" APP_ID ".QuakeDaemon.desktop"
 #define QUAKE_CONFIGURE_ACTION "configure-shortcut"
+#define QUAKE_QUIT_ACTION "quit"
 
 typedef struct
 {
@@ -219,6 +220,71 @@ configure_call_cb (GObject      *object,
     g_task_return_error (task, g_steal_pointer (&error));
 }
 
+typedef struct
+{
+  GTask           *task;
+  GDBusConnection *connection;
+  guint            watch_id;
+  guint            timeout_id;
+} ConfigureDaemonWait;
+
+static void
+configure_daemon_wait_free (ConfigureDaemonWait *wait)
+{
+  if (wait->watch_id != 0)
+    g_bus_unwatch_name (wait->watch_id);
+  if (wait->timeout_id != 0)
+    g_source_remove (wait->timeout_id);
+  g_clear_object (&wait->task);
+  g_clear_object (&wait->connection);
+  g_free (wait);
+}
+
+static void
+configure_daemon_appeared_cb (GDBusConnection *connection,
+                              const char      *name,
+                              const char      *name_owner,
+                              gpointer         user_data)
+{
+  ConfigureDaemonWait *wait = user_data;
+  g_autoptr(GTask) task = g_steal_pointer (&wait->task);
+  g_autofree char *daemon_id = g_strdup (name);
+  g_autofree char *object_path = g_strdup_printf ("/%s/QuakeDaemon", APP_ID);
+
+  g_strdelimit (object_path, ".", '/');
+  configure_daemon_wait_free (wait);
+
+  g_dbus_connection_call (connection,
+                          daemon_id,
+                          object_path,
+                          "org.freedesktop.Application",
+                          "ActivateAction",
+                          g_variant_new ("(s@av@a{sv})",
+                                         QUAKE_CONFIGURE_ACTION,
+                                         g_variant_new_array (G_VARIANT_TYPE_VARIANT, NULL, 0),
+                                         g_variant_new_array (G_VARIANT_TYPE ("{sv}"), NULL, 0)),
+                          NULL,
+                          G_DBUS_CALL_FLAGS_NONE,
+                          -1,
+                          g_task_get_cancellable (task),
+                          configure_call_cb,
+                          g_steal_pointer (&task));
+}
+
+static gboolean
+configure_daemon_timeout_cb (gpointer user_data)
+{
+  ConfigureDaemonWait *wait = user_data;
+
+  wait->timeout_id = 0;
+  g_task_return_new_error (wait->task,
+                           G_IO_ERROR,
+                           G_IO_ERROR_TIMED_OUT,
+                           "The Quake shortcut service did not start");
+  configure_daemon_wait_free (wait);
+  return G_SOURCE_REMOVE;
+}
+
 static void
 configure_version_cb (GObject      *object,
                       GAsyncResult *result,
@@ -231,7 +297,7 @@ configure_version_cb (GObject      *object,
   g_autoptr(GVariant) inner = NULL;
   g_autoptr(GError) error = NULL;
   g_autofree char *daemon_id = NULL;
-  g_autofree char *object_path = NULL;
+  ConfigureDaemonWait *wait;
   guint version;
 
   reply = g_dbus_connection_call_finish (connection, result, &error);
@@ -254,24 +320,21 @@ configure_version_cb (GObject      *object,
     }
 
   daemon_id = g_strconcat (APP_ID, ".QuakeDaemon", NULL);
-  object_path = g_strdup_printf ("/%s/QuakeDaemon", APP_ID);
-  g_strdelimit (object_path, ".", '/');
+  ptyxis_quake_service_start ();
 
-  g_dbus_connection_call (connection,
-                          daemon_id,
-                          object_path,
-                          "org.freedesktop.Application",
-                          "ActivateAction",
-                          g_variant_new ("(s@av@a{sv})",
-                                         QUAKE_CONFIGURE_ACTION,
-                                         g_variant_new_array (G_VARIANT_TYPE_VARIANT, NULL, 0),
-                                         g_variant_new_array (G_VARIANT_TYPE ("{sv}"), NULL, 0)),
-                          NULL,
-                          G_DBUS_CALL_FLAGS_NONE,
-                          -1,
-                          g_task_get_cancellable (task),
-                          configure_call_cb,
-                          g_steal_pointer (&task));
+  wait = g_new0 (ConfigureDaemonWait, 1);
+  wait->task = g_steal_pointer (&task);
+  wait->connection = g_object_ref (connection);
+  wait->watch_id = g_bus_watch_name_on_connection (connection,
+                                                   daemon_id,
+                                                   G_BUS_NAME_WATCHER_FLAGS_AUTO_START,
+                                                   configure_daemon_appeared_cb,
+                                                   NULL,
+                                                   wait,
+                                                   NULL);
+  wait->timeout_id = g_timeout_add_seconds (5,
+                                            configure_daemon_timeout_cb,
+                                            wait);
 }
 
 static void
@@ -327,6 +390,66 @@ ptyxis_quake_service_configure_finish (GAsyncResult  *result,
   g_return_val_if_fail (g_task_is_valid (result, NULL), FALSE);
   g_return_val_if_fail (g_task_get_source_tag (G_TASK (result)) ==
                         ptyxis_quake_service_configure_async, FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
+}
+
+static void
+stop_bus_cb (GObject      *object,
+             GAsyncResult *result,
+             gpointer      user_data)
+{
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GDBusConnection) connection = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autofree char *daemon_id = NULL;
+  g_autofree char *object_path = NULL;
+
+  connection = g_bus_get_finish (result, &error);
+  if (connection == NULL)
+    {
+      g_task_return_error (task, g_steal_pointer (&error));
+      return;
+    }
+
+  daemon_id = g_strconcat (APP_ID, ".QuakeDaemon", NULL);
+  object_path = g_strdup_printf ("/%s/QuakeDaemon", APP_ID);
+  g_strdelimit (object_path, ".", '/');
+  g_dbus_connection_call (connection,
+                          daemon_id,
+                          object_path,
+                          "org.freedesktop.Application",
+                          "ActivateAction",
+                          g_variant_new ("(s@av@a{sv})",
+                                         QUAKE_QUIT_ACTION,
+                                         g_variant_new_array (G_VARIANT_TYPE_VARIANT, NULL, 0),
+                                         g_variant_new_array (G_VARIANT_TYPE ("{sv}"), NULL, 0)),
+                          NULL,
+                          G_DBUS_CALL_FLAGS_NO_AUTO_START,
+                          -1,
+                          g_task_get_cancellable (task),
+                          configure_call_cb,
+                          g_steal_pointer (&task));
+}
+
+void
+ptyxis_quake_service_stop_async (GCancellable        *cancellable,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+  GTask *task = g_task_new (NULL, cancellable, callback, user_data);
+
+  g_task_set_source_tag (task, ptyxis_quake_service_stop_async);
+  g_bus_get (G_BUS_TYPE_SESSION, cancellable, stop_bus_cb, task);
+}
+
+gboolean
+ptyxis_quake_service_stop_finish (GAsyncResult  *result,
+                                  GError       **error)
+{
+  g_return_val_if_fail (g_task_is_valid (result, NULL), FALSE);
+  g_return_val_if_fail (g_task_get_source_tag (G_TASK (result)) ==
+                        ptyxis_quake_service_stop_async, FALSE);
 
   return g_task_propagate_boolean (G_TASK (result), error);
 }

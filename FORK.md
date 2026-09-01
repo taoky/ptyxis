@@ -147,6 +147,9 @@ has not been comprehensively tested.
   requests the binding and the desktop may show a permission dialog.
 - Preferences provides a **Change Shortcut…** button which asks the version 2
   Global Shortcuts portal to show its trusted shortcut configuration UI.
+  The same section can start or stop the daemon for the current login;
+  daemon-dependent controls are disabled while it is stopped. This does not
+  change the separate login-autostart preference.
 - Portal activations use the compositor-provided activation token. If the
   Quake window is hidden or visible but unfocused, the shortcut presents it in
   the foreground; if it is already focused, the shortcut hides it. Invoking
