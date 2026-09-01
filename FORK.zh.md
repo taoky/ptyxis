@@ -113,8 +113,13 @@ pane 时会撤回通知。
   会复用该窗口，而不是创建普通窗口。
 - Quake 窗口不会参与普通的最近使用窗口选择、常规尺寸决策或会话持久化。
 - 标题栏和样式会明确标识它是 Quake 终端，以便与普通 Ptyxis 窗口区分。
-- 未实现 Global Shortcuts portal 集成。在 Wayland 下，请在桌面环境或合成器中将
-  `ptyxis --toggle-quake` 配置为全局快捷键命令。
+- Global Shortcuts portal 提供应用级全局快捷键，首选按键为 `Ctrl+grave`
+  （Ctrl 加反引号键）。已有的 portal 绑定会静默恢复；若尚无绑定，运行
+  `ptyxis --toggle-quake` 会请求创建绑定，此时桌面环境可能显示许可对话框。
+- 从 portal 激活快捷键时会使用合成器提供的 activation token。Quake 窗口隐藏或
+  可见但未聚焦时，快捷键会将它带到前台；窗口已聚焦时则会隐藏它。不带
+  activation token 执行 `ptyxis --toggle-quake` 时，仍保持原有的显示／隐藏切换
+  行为。
 
 窗口位置和动画仍由合成器负责。尤其是 Wayland 协议不允许普通应用可靠地指定屏幕
 边缘的绝对位置，因此无法保证它在所有桌面上都能像合成器原生的下拉终端一样工作。

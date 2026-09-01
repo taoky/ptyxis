@@ -134,9 +134,16 @@ has not been comprehensively tested.
   ordinary sizing decisions, and session persistence.
 - Its header bar and styling identify it as a Quake terminal so it is visually
   distinguishable from a normal Ptyxis window.
-- No Global Shortcuts portal integration is included. On Wayland, configure
-  the desktop environment or compositor to run `ptyxis --toggle-quake` from a
-  global shortcut.
+- The Global Shortcuts portal provides an application-wide shortcut with
+  `Ctrl+grave` (Ctrl plus the grave-accent key) as its preferred trigger.
+  Existing portal bindings are restored silently; if none exists, running
+  `ptyxis --toggle-quake` requests the binding and the desktop may show a
+  permission dialog.
+- Portal activations use the compositor-provided activation token. If the
+  Quake window is hidden or visible but unfocused, the shortcut presents it in
+  the foreground; if it is already focused, the shortcut hides it. Invoking
+  `ptyxis --toggle-quake` without an activation token retains the original
+  visible/hidden toggle behavior.
 
 Window placement and animation remain the compositor's responsibility. In
 particular, the Wayland protocol does not let a normal application reliably
