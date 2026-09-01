@@ -1,6 +1,7 @@
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
 data/org.gnome.Ptyxis.desktop.in.in
+data/org.gnome.Ptyxis.QuakeDaemon.desktop.in.in
 data/org.gnome.Ptyxis.metainfo.xml.in.in
 src/main.c
 src/org.gnome.Ptyxis.gschema.xml.in
@@ -11,6 +12,7 @@ src/ptyxis-custom-link-editor.ui
 src/ptyxis-custom-link-row.c
 src/ptyxis-custom-link-row.ui
 src/ptyxis-find-bar.ui
+src/ptyxis-global-shortcuts.c
 src/ptyxis-inspector.c
 src/ptyxis-inspector.ui
 src/ptyxis-menu-row.c
@@ -31,6 +33,7 @@ src/ptyxis-shortcut-row.ui
 src/ptyxis-tab.c
 src/ptyxis-tab-notify.h
 src/ptyxis-terminal.c
+src/ptyxis-terminal-picker.c
 src/ptyxis-terminal.ui
 src/ptyxis-theme-selector.ui
 src/ptyxis-title-dialog.ui
