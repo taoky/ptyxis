@@ -445,13 +445,19 @@ ptyxis_preferences_window_quake_configure_cb (GObject      *object,
 {
   g_autoptr(PtyxisPreferencesWindow) self = user_data;
   g_autoptr(GError) error = NULL;
+  gboolean not_supported;
 
   if (!ptyxis_quake_service_configure_finish (result, &error) &&
       !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-    adw_preferences_window_add_toast (ADW_PREFERENCES_WINDOW (self),
-                                      adw_toast_new (error->message));
+    {
+      adw_preferences_window_add_toast (ADW_PREFERENCES_WINDOW (self),
+                                        adw_toast_new (error->message));
+      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+        gtk_widget_set_sensitive (GTK_WIDGET (self->quake_change_shortcut), FALSE);
+    }
 
-  if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+  not_supported = g_error_matches (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED);
+  if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED) && !not_supported)
     gtk_widget_set_sensitive (GTK_WIDGET (self->quake_change_shortcut),
                               self->quake_daemon_running);
   g_clear_object (&self->quake_configure_cancellable);
