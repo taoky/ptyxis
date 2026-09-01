@@ -231,8 +231,6 @@ portal_response_cb (GDBusConnection *connection,
       g_free (self->session_handle);
       self->session_handle = g_strdup (session_handle);
       ptyxis_global_shortcuts_list (self);
-      if (self->configure_requested)
-        ptyxis_global_shortcuts_configure (self, "");
     }
   else if (request == REQUEST_LIST_SHORTCUTS ||
            request == REQUEST_BIND_SHORTCUTS)
@@ -243,9 +241,11 @@ portal_response_cb (GDBusConnection *connection,
       self->bound = shortcuts_contains_quake (shortcuts);
       shortcuts_emit_changed (self, shortcuts);
 
-      if (request == REQUEST_LIST_SHORTCUTS &&
-          !self->bound &&
-          self->bind_requested)
+      if (request == REQUEST_BIND_SHORTCUTS)
+        self->configure_requested = FALSE;
+      else if (self->configure_requested)
+        ptyxis_global_shortcuts_configure (self, "");
+      else if (!self->bound && self->bind_requested)
         ptyxis_global_shortcuts_ensure_bound (self);
     }
 }
@@ -706,8 +706,16 @@ ptyxis_global_shortcuts_configure (PtyxisGlobalShortcuts *self,
   g_return_if_fail (PTYXIS_IS_GLOBAL_SHORTCUTS (self));
 
   self->configure_requested = TRUE;
-  if (self->connection == NULL || self->session_handle == NULL)
+  if (self->connection == NULL ||
+      self->session_handle == NULL ||
+      self->request != REQUEST_NONE)
     return;
+
+  if (!self->bound)
+    {
+      ptyxis_global_shortcuts_ensure_bound (self);
+      return;
+    }
 
   self->configure_requested = FALSE;
   g_variant_builder_init (&options, G_VARIANT_TYPE_VARDICT);

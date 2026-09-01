@@ -121,7 +121,6 @@ daemon_activate_cb (GApplication *application,
                             self);
   ptyxis_global_shortcuts_register (self->shortcuts);
   ptyxis_global_shortcuts_start (self->shortcuts);
-  ptyxis_global_shortcuts_ensure_bound (self->shortcuts);
 
   g_application_hold (application);
 }

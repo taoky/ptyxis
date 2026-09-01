@@ -68,7 +68,7 @@
           <object class="AdwPreferencesGroup" id="opacity_group">
             <property name="visible">false</property>
             <child>
-              <object class="AdwActionRow" id="quake_shortcut">
+              <object class="AdwActionRow">
                 <property name="title" translatable="yes">Transparency</property>
                 <property name="subtitle" translatable="yes">Reduces the opacity of the background window</property>
                 <property name="activatable-widget">opacity</property>
@@ -417,9 +417,10 @@
               </object>
             </child>
             <child>
-              <object class="AdwActionRow">
+              <object class="AdwActionRow" id="quake_shortcut">
                 <property name="title" translatable="yes">Global Shortcut</property>
                 <property name="subtitle" translatable="yes">Configured securely by your desktop</property>
+                <property name="use-markup">false</property>
                 <child type="suffix">
                   <object class="GtkButton" id="quake_change_shortcut">
                     <property name="label" translatable="yes">Change Shortcut…</property>
