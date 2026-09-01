@@ -397,6 +397,17 @@
         </child>
         <child>
           <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Quake Mode</property>
+            <child>
+              <object class="AdwSwitchRow" id="quake_autostart">
+                <property name="title" translatable="yes">Start Shortcut Service at Login</property>
+                <property name="subtitle" translatable="yes">Keep the global Quake shortcut available before Ptyxis is opened</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
             <property name="title" translatable="yes">Accessibility</property>
             <child>
               <object class="AdwSwitchRow" id="enable_a11y">

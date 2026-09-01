@@ -30,9 +30,9 @@
 #include "ptyxis-application.h"
 #include "ptyxis-build-ident.h"
 #include "ptyxis-client.h"
-#include "ptyxis-global-shortcuts.h"
 #include "ptyxis-palette.h"
 #include "ptyxis-preferences-window.h"
+#include "ptyxis-quake-service.h"
 #include "ptyxis-session.h"
 #include "ptyxis-settings.h"
 #include "ptyxis-util.h"
@@ -51,7 +51,6 @@ struct _PtyxisApplication
   char                *next_title_prefix;
   char                *system_font_name;
   GDBusProxy          *portal;
-  PtyxisGlobalShortcuts *global_shortcuts;
   PtyxisClient        *client;
   PtyxisWindow        *quake_window;
   GHashTable          *exited;
@@ -62,6 +61,7 @@ struct _PtyxisApplication
   guint                client_is_fallback : 1;
   guint                maximize : 1;
   guint                fullscreen : 1;
+  guint                quake_prompt_active : 1;
 };
 
 static void ptyxis_application_about             (GSimpleAction *action,
@@ -91,12 +91,16 @@ static void ptyxis_application_focus_pane_by_uuid_action (GSimpleAction *action,
 static void ptyxis_application_apply_default_size(PtyxisApplication *self,
                                                   PtyxisTerminal    *terminal);
 static void ptyxis_application_toggle_quake       (PtyxisApplication *self,
-                                                   const char        *activation_token);
+                                                   gboolean           from_global_shortcut);
+static void ptyxis_application_toggle_quake_action(GSimpleAction     *action,
+                                                   GVariant          *param,
+                                                   gpointer           user_data);
 
 static GActionEntry action_entries[] = {
   { "about", ptyxis_application_about },
   { "edit-profile", ptyxis_application_edit_profile, "s" },
   { "preferences", ptyxis_application_preferences },
+  { "toggle-quake", ptyxis_application_toggle_quake_action },
   { "focus-tab-by-uuid", ptyxis_application_focus_tab_by_uuid, "s" },
   { "focus-pane-by-uuid", ptyxis_application_focus_pane_by_uuid_action, "(ss)" },
   { "new-window", ptyxis_application_new_window_action },
@@ -409,7 +413,7 @@ get_current_window (PtyxisApplication *self)
 
 static void
 ptyxis_application_toggle_quake (PtyxisApplication *self,
-                                  const char        *activation_token)
+                                  gboolean           from_global_shortcut)
 {
   g_assert (PTYXIS_IS_APPLICATION (self));
 
@@ -422,7 +426,7 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
     }
 
   if (gtk_widget_get_visible (GTK_WIDGET (self->quake_window)) &&
-      (activation_token == NULL ||
+      (!from_global_shortcut ||
        gtk_window_is_active (GTK_WINDOW (self->quake_window))))
     {
       gtk_widget_set_visible (GTK_WIDGET (self->quake_window), FALSE);
@@ -430,9 +434,6 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
   else
     {
       PtyxisTab *tab = ptyxis_window_get_active_tab (self->quake_window);
-
-      if (activation_token != NULL)
-        gtk_window_set_startup_id (GTK_WINDOW (self->quake_window), activation_token);
 
       gtk_window_present (GTK_WINDOW (self->quake_window));
 
@@ -442,14 +443,171 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
 }
 
 static void
-ptyxis_application_global_shortcut_activated_cb (PtyxisApplication     *self,
-                                                 const char            *activation_token,
-                                                 PtyxisGlobalShortcuts *global_shortcuts)
+ptyxis_application_toggle_quake_action (GSimpleAction *action,
+                                        GVariant      *param,
+                                        gpointer       user_data)
 {
-  g_assert (PTYXIS_IS_APPLICATION (self));
-  g_assert (PTYXIS_IS_GLOBAL_SHORTCUTS (global_shortcuts));
+  PtyxisApplication *self = user_data;
 
-  ptyxis_application_toggle_quake (self, activation_token);
+  g_assert (PTYXIS_IS_APPLICATION (self));
+
+  ptyxis_application_toggle_quake (self, TRUE);
+}
+
+typedef struct
+{
+  PtyxisApplication *application;
+  gboolean           autostart;
+} QuakeProvision;
+
+static void
+quake_provision_free (QuakeProvision *provision)
+{
+  g_clear_object (&provision->application);
+  g_free (provision);
+}
+
+static void
+ptyxis_application_show_quake_service_error (PtyxisApplication *self,
+                                              const GError      *error)
+{
+  AdwAlertDialog *dialog;
+  GtkWindow *parent;
+
+  g_assert (PTYXIS_IS_APPLICATION (self));
+  g_assert (error != NULL);
+
+  dialog = ADW_ALERT_DIALOG (adw_alert_dialog_new (_("Quake Shortcut Service Unavailable"),
+                                                   error->message));
+  adw_alert_dialog_add_response (dialog, "close", _("Close"));
+  adw_alert_dialog_set_default_response (dialog, "close");
+  adw_alert_dialog_set_close_response (dialog, "close");
+  parent = self->quake_window != NULL
+         ? GTK_WINDOW (self->quake_window)
+         : gtk_application_get_active_window (GTK_APPLICATION (self));
+  if (parent != NULL)
+    adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (parent));
+  else
+    g_warning ("Quake shortcut service unavailable: %s", error->message);
+}
+
+static void
+ptyxis_application_quake_background_fallback_cb (GObject      *object,
+                                                  GAsyncResult *result,
+                                                  gpointer      user_data)
+{
+  g_autoptr(PtyxisApplication) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  if (ptyxis_quake_service_set_autostart_finish (result, &error))
+    ptyxis_quake_service_start ();
+  else
+    ptyxis_application_show_quake_service_error (self, error);
+}
+
+static void
+ptyxis_application_quake_provision_cb (GObject      *object,
+                                       GAsyncResult *result,
+                                       gpointer      user_data)
+{
+  QuakeProvision *provision = user_data;
+  PtyxisApplication *self = provision->application;
+  GSettings *settings = ptyxis_settings_get_settings (self->settings);
+  g_autoptr(GError) error = NULL;
+
+  if (ptyxis_quake_service_set_autostart_finish (result, &error))
+    {
+      g_settings_set_boolean (settings,
+                              PTYXIS_QUAKE_AUTOSTART_KEY,
+                              provision->autostart);
+      ptyxis_quake_service_start ();
+    }
+  else if (provision->autostart)
+    {
+      ptyxis_application_show_quake_service_error (self, error);
+
+      /* Autostart can be rejected independently. Still ask for background
+       * access so the shortcut can remain available for this login. */
+      ptyxis_quake_service_set_autostart_async (
+        self->quake_window != NULL ? GTK_WINDOW (self->quake_window) : NULL,
+        FALSE,
+        NULL,
+        ptyxis_application_quake_background_fallback_cb,
+        g_object_ref (self));
+    }
+  else
+    ptyxis_application_show_quake_service_error (self, error);
+
+  quake_provision_free (provision);
+}
+
+static void
+ptyxis_application_quake_prompt_cb (GObject      *object,
+                                    GAsyncResult *result,
+                                    gpointer      user_data)
+{
+  g_autoptr(PtyxisApplication) self = user_data;
+  const char *response;
+  GSettings *settings;
+  QuakeProvision *provision;
+  gboolean autostart;
+
+  response = adw_alert_dialog_choose_finish (ADW_ALERT_DIALOG (object), result);
+  self->quake_prompt_active = FALSE;
+  autostart = g_strcmp0 (response, "autostart") == 0;
+  settings = ptyxis_settings_get_settings (self->settings);
+
+  g_settings_set_boolean (settings, PTYXIS_QUAKE_PROMPTED_KEY, TRUE);
+
+  provision = g_new0 (QuakeProvision, 1);
+  provision->application = g_object_ref (self);
+  provision->autostart = autostart;
+
+  ptyxis_quake_service_set_autostart_async (
+    self->quake_window != NULL ? GTK_WINDOW (self->quake_window) : NULL,
+    autostart,
+    NULL,
+    ptyxis_application_quake_provision_cb,
+    provision);
+}
+
+static void
+ptyxis_application_ensure_quake_service (PtyxisApplication *self)
+{
+  GSettings *settings;
+  AdwAlertDialog *dialog;
+
+  g_assert (PTYXIS_IS_APPLICATION (self));
+
+  settings = ptyxis_settings_get_settings (self->settings);
+  if (g_settings_get_boolean (settings, PTYXIS_QUAKE_PROMPTED_KEY))
+    {
+      ptyxis_quake_service_start ();
+      return;
+    }
+
+  if (self->quake_prompt_active)
+    return;
+
+  self->quake_prompt_active = TRUE;
+
+  dialog = ADW_ALERT_DIALOG (
+    adw_alert_dialog_new (_("Keep the Quake Shortcut Ready?"),
+                          _("Ptyxis can start a small shortcut service when you log in, so the Quake shortcut works before Ptyxis has been opened. You can change this later in Preferences.")));
+  adw_alert_dialog_add_responses (dialog,
+                                  "no-autostart", _("Don't Start at Login"),
+                                  "autostart", _("Start at Login"),
+                                  NULL);
+  adw_alert_dialog_set_response_appearance (dialog,
+                                            "autostart",
+                                            ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response (dialog, "autostart");
+  adw_alert_dialog_set_close_response (dialog, "no-autostart");
+  adw_alert_dialog_choose (dialog,
+                           GTK_WIDGET (self->quake_window),
+                           NULL,
+                           ptyxis_application_quake_prompt_cb,
+                           g_object_ref (self));
 }
 
 static void
@@ -563,10 +721,8 @@ ptyxis_application_command_line (GApplication            *app,
           return EXIT_FAILURE;
         }
 
-      if (self->global_shortcuts != NULL)
-        ptyxis_global_shortcuts_ensure_bound (self->global_shortcuts);
-
-      ptyxis_application_toggle_quake (self, NULL);
+      ptyxis_application_toggle_quake (self, FALSE);
+      ptyxis_application_ensure_quake_service (self);
       return EXIT_SUCCESS;
     }
 
@@ -1020,13 +1176,6 @@ ptyxis_application_startup (GApplication *application)
 
   G_APPLICATION_CLASS (ptyxis_application_parent_class)->startup (application);
 
-  if (!is_standalone (self))
-    {
-      self->global_shortcuts =
-        ptyxis_global_shortcuts_new (g_application_get_application_id (application));
-      ptyxis_global_shortcuts_register (self->global_shortcuts);
-    }
-
   if ((sandbox_agent = ptyxis_application_should_sandbox_agent (self)))
     timeout_msec = G_MAXINT;
   else
@@ -1085,16 +1234,6 @@ ptyxis_application_startup (GApplication *application)
                                      NULL,
                                      G_FILE_MONITOR_EVENT_CHANGED,
                                      self->xdg_terminals_list_monitor);
-    }
-
-  if (self->global_shortcuts != NULL)
-    {
-      g_signal_connect_object (self->global_shortcuts,
-                               "activated",
-                               G_CALLBACK (ptyxis_application_global_shortcut_activated_cb),
-                               self,
-                               G_CONNECT_SWAPPED);
-      ptyxis_global_shortcuts_start (self->global_shortcuts);
     }
 
   /* Setup portal to get settings */
@@ -1157,7 +1296,6 @@ ptyxis_application_finalize (GObject *object)
   g_clear_object (&self->xdg_terminals_list_monitor);
   g_clear_object (&self->profiles);
   g_clear_object (&self->portal);
-  g_clear_object (&self->global_shortcuts);
   g_clear_object (&self->shortcuts);
   g_clear_object (&self->settings);
   g_clear_object (&self->client);

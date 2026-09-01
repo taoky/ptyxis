@@ -28,6 +28,7 @@ typedef struct
 {
   PtyxisGlobalShortcuts *self;
   RequestKind            request;
+  guint                  serial;
 } PortalCall;
 
 struct _PtyxisGlobalShortcuts
@@ -39,6 +40,8 @@ struct _PtyxisGlobalShortcuts
   char            *session_handle;
   guint            response_subscription;
   guint            activated_subscription;
+  guint            portal_owner_subscription;
+  guint            request_serial;
   RequestKind      request;
   guint            bound : 1;
   guint            bind_requested : 1;
@@ -56,6 +59,7 @@ G_DEFINE_FINAL_TYPE (PtyxisGlobalShortcuts, ptyxis_global_shortcuts, G_TYPE_OBJE
 
 static void ptyxis_global_shortcuts_list (PtyxisGlobalShortcuts *self);
 static void ptyxis_global_shortcuts_bind (PtyxisGlobalShortcuts *self);
+static void ptyxis_global_shortcuts_register_app_id (PtyxisGlobalShortcuts *self);
 
 static gboolean
 shortcuts_contains_quake (GVariant *shortcuts)
@@ -134,7 +138,8 @@ portal_call_cb (GObject      *object,
     {
       g_debug ("Global shortcuts portal call failed: %s", error->message);
 
-      if (self->request == call->request)
+      if (self->request == call->request &&
+          self->request_serial == call->serial)
         {
           self->request = REQUEST_NONE;
 
@@ -243,6 +248,7 @@ portal_request (PtyxisGlobalShortcuts *self,
   call = g_new0 (PortalCall, 1);
   call->self = g_object_ref (self);
   call->request = request;
+  call->serial = ++self->request_serial;
 
   g_dbus_connection_call (self->connection,
                           PORTAL_BUS_NAME,
@@ -346,6 +352,45 @@ activated_cb (GDBusConnection *connection,
 }
 
 static void
+portal_owner_changed_cb (GDBusConnection *connection,
+                         const char      *sender_name,
+                         const char      *object_path,
+                         const char      *interface_name,
+                         const char      *signal_name,
+                         GVariant        *parameters,
+                         gpointer         user_data)
+{
+  PtyxisGlobalShortcuts *self = user_data;
+  const char *name;
+  const char *old_owner;
+  const char *new_owner;
+
+  g_variant_get (parameters, "(&s&s&s)", &name, &old_owner, &new_owner);
+  if (!g_str_equal (name, PORTAL_BUS_NAME))
+    return;
+
+  if (new_owner[0] == '\0')
+    {
+      if (self->response_subscription != 0)
+        {
+          g_dbus_connection_signal_unsubscribe (connection,
+                                                self->response_subscription);
+          self->response_subscription = 0;
+        }
+
+      self->request = REQUEST_NONE;
+      self->request_serial++;
+      self->bound = FALSE;
+      self->started = FALSE;
+      g_clear_pointer (&self->session_handle, g_free);
+      return;
+    }
+
+  ptyxis_global_shortcuts_register_app_id (self);
+  ptyxis_global_shortcuts_start (self);
+}
+
+static void
 ptyxis_global_shortcuts_dispose (GObject *object)
 {
   PtyxisGlobalShortcuts *self = (PtyxisGlobalShortcuts *)object;
@@ -367,6 +412,13 @@ ptyxis_global_shortcuts_dispose (GObject *object)
           g_dbus_connection_signal_unsubscribe (self->connection,
                                                 self->activated_subscription);
           self->activated_subscription = 0;
+        }
+
+      if (self->portal_owner_subscription != 0)
+        {
+          g_dbus_connection_signal_unsubscribe (self->connection,
+                                                self->portal_owner_subscription);
+          self->portal_owner_subscription = 0;
         }
     }
 
@@ -424,46 +476,14 @@ ptyxis_global_shortcuts_new (const char *application_id)
   return self;
 }
 
-void
-ptyxis_global_shortcuts_register (PtyxisGlobalShortcuts *self)
+static void
+ptyxis_global_shortcuts_register_app_id (PtyxisGlobalShortcuts *self)
 {
-  g_autofree char *address = NULL;
   g_autoptr(GError) error = NULL;
   g_autoptr(GVariant) reply = NULL;
 
   g_return_if_fail (PTYXIS_IS_GLOBAL_SHORTCUTS (self));
-  g_return_if_fail (self->connection == NULL);
-
-  self->cancellable = g_cancellable_new ();
-
-  address = g_dbus_address_get_for_bus_sync (G_BUS_TYPE_SESSION,
-                                             self->cancellable,
-                                             &error);
-  if (address == NULL)
-    {
-      g_debug ("Failed to get session bus address for global shortcuts: %s",
-               error->message);
-      return;
-    }
-
-  /* Use a private connection because Registry.Register() associates the
-   * calling D-Bus peer with exactly one application ID. The shared connection
-   * returned by g_bus_get_sync() may already have made unrelated portal calls
-   * by the time application startup reaches us. */
-  self->connection =
-    g_dbus_connection_new_for_address_sync (
-      address,
-      G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
-      G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
-      NULL,
-      self->cancellable,
-      &error);
-  if (self->connection == NULL)
-    {
-      g_debug ("Failed to open session bus connection for global shortcuts: %s",
-               error->message);
-      return;
-    }
+  g_return_if_fail (G_IS_DBUS_CONNECTION (self->connection));
 
   /* Newer host portals require unsandboxed applications to associate their
    * D-Bus peer with an installed desktop application before any portal call.
@@ -489,6 +509,60 @@ ptyxis_global_shortcuts_register (PtyxisGlobalShortcuts *self)
 }
 
 void
+ptyxis_global_shortcuts_register (PtyxisGlobalShortcuts *self)
+{
+  g_autofree char *address = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_return_if_fail (PTYXIS_IS_GLOBAL_SHORTCUTS (self));
+  g_return_if_fail (self->connection == NULL);
+
+  self->cancellable = g_cancellable_new ();
+
+  address = g_dbus_address_get_for_bus_sync (G_BUS_TYPE_SESSION,
+                                             self->cancellable,
+                                             &error);
+  if (address == NULL)
+    {
+      g_debug ("Failed to get session bus address for global shortcuts: %s",
+               error->message);
+      return;
+    }
+
+  /* Use a private connection because Registry.Register() associates the
+   * calling D-Bus peer with exactly one application ID. The shared connection
+   * returned by g_bus_get_sync() may already have made unrelated portal calls. */
+  self->connection =
+    g_dbus_connection_new_for_address_sync (
+      address,
+      G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
+      G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+      NULL,
+      self->cancellable,
+      &error);
+  if (self->connection == NULL)
+    {
+      g_debug ("Failed to open session bus connection for global shortcuts: %s",
+               error->message);
+      return;
+    }
+
+  self->portal_owner_subscription =
+    g_dbus_connection_signal_subscribe (self->connection,
+                                        "org.freedesktop.DBus",
+                                        "org.freedesktop.DBus",
+                                        "NameOwnerChanged",
+                                        "/org/freedesktop/DBus",
+                                        PORTAL_BUS_NAME,
+                                        G_DBUS_SIGNAL_FLAGS_NONE,
+                                        portal_owner_changed_cb,
+                                        self,
+                                        NULL);
+
+  ptyxis_global_shortcuts_register_app_id (self);
+}
+
+void
 ptyxis_global_shortcuts_start (PtyxisGlobalShortcuts *self)
 {
   GVariantBuilder options;
@@ -501,17 +575,18 @@ ptyxis_global_shortcuts_start (PtyxisGlobalShortcuts *self)
     return;
 
   self->started = TRUE;
-  self->activated_subscription =
-    g_dbus_connection_signal_subscribe (self->connection,
-                                        PORTAL_BUS_NAME,
-                                        PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
-                                        "Activated",
-                                        PORTAL_OBJECT_PATH,
-                                        NULL,
-                                        G_DBUS_SIGNAL_FLAGS_NONE,
-                                        activated_cb,
-                                        self,
-                                        NULL);
+  if (self->activated_subscription == 0)
+    self->activated_subscription =
+      g_dbus_connection_signal_subscribe (self->connection,
+                                          PORTAL_BUS_NAME,
+                                          PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
+                                          "Activated",
+                                          PORTAL_OBJECT_PATH,
+                                          NULL,
+                                          G_DBUS_SIGNAL_FLAGS_NONE,
+                                          activated_cb,
+                                          self,
+                                          NULL);
 
   handle_token = make_token ("create");
   session_token = make_token ("quake");

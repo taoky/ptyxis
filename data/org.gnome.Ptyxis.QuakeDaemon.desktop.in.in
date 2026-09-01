@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Ptyxis Quake Shortcut Service
+Comment=Keep the Quake terminal global shortcut available
+Exec=@QUAKE_DAEMON@
+TryExec=@QUAKE_DAEMON@
+Terminal=false
+Type=Application
+NoDisplay=true

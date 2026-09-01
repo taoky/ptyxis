@@ -82,6 +82,8 @@ config_h.set_quoted('APP_SCHEMA_SHORTCUTS_PATH', app_schema_shortcuts_path)
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
 config_h.set_quoted('GETTEXT_PACKAGE', 'ptyxis')
 config_h.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
+config_h.set_quoted('BINDIR', get_option('prefix') / get_option('bindir'))
+config_h.set_quoted('PKGDATADIR', get_option('prefix') / get_option('datadir') / 'ptyxis')
 # LIBEXECDIR must be expanded in config.h
 config_h.set_quoted('LIBEXECDIR', get_option('prefix') / get_option('libexecdir'))
 config_h.set_quoted('PACKAGE_WEBSITE', 'https://gitlab.gnome.org/chergert/ptyxis')

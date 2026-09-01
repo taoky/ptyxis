@@ -12,7 +12,6 @@ ptyxis_sources = [
   'ptyxis-find-bar.c',
   'ptyxis-fullscreen-box.c',
   'ptyxis-gated-list-model.c',
-  'ptyxis-global-shortcuts.c',
   'ptyxis-inspector.c',
   'ptyxis-menu-row.c',
   'ptyxis-palette.c',
@@ -25,6 +24,7 @@ ptyxis_sources = [
   'ptyxis-profile-editor.c',
   'ptyxis-profile-row.c',
   'ptyxis-profile.c',
+  'ptyxis-quake-service.c',
   'ptyxis-session.c',
   'ptyxis-settings.c',
   'ptyxis-shortcut-accel-dialog.c',
@@ -122,4 +122,12 @@ executable('ptyxis', ptyxis_sources + ptyxis_agent_ipc,
               install: true,
                c_args: ptyxis_c_args,
   include_directories: ptyxis_include_directories,
+)
+
+executable('ptyxis-quake-daemon',
+  ['ptyxis-quake-daemon.c', 'ptyxis-global-shortcuts.c'],
+  dependencies: [dependency('gio-2.0', version: glib_req)],
+  install: true,
+  c_args: ptyxis_c_args,
+  include_directories: include_directories('.', '..'),
 )

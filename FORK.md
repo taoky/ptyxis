@@ -134,15 +134,21 @@ has not been comprehensively tested.
   ordinary sizing decisions, and session persistence.
 - Its header bar and styling identify it as a Quake terminal so it is visually
   distinguishable from a normal Ptyxis window.
-- The Global Shortcuts portal provides an application-wide shortcut with
-  `Ctrl+grave` (Ctrl plus the grave-accent key) as its preferred trigger.
-  Existing portal bindings are restored silently; if none exists, running
-  `ptyxis --toggle-quake` requests the binding and the desktop may show a
-  permission dialog.
+- A small `ptyxis-quake-daemon` process holds the Global Shortcuts portal
+  session, with `Ctrl+grave` (Ctrl plus the grave-accent key) as its preferred
+  trigger. It starts only after Quake mode is first used or explicitly enabled
+  in Preferences, and contains no terminal or window implementation.
+- On first use, Ptyxis asks whether the shortcut service should start at
+  login. Flatpak builds use the Background portal; native builds use a
+  per-user XDG autostart entry. Declining still keeps the shortcut available
+  for the current login, and the choice can be changed later under Behavior in
+  Preferences.
+- Existing portal bindings are restored silently; if none exists, the daemon
+  requests the binding and the desktop may show a permission dialog.
 - Portal activations use the compositor-provided activation token. If the
   Quake window is hidden or visible but unfocused, the shortcut presents it in
   the foreground; if it is already focused, the shortcut hides it. Invoking
-  `ptyxis --toggle-quake` without an activation token retains the original
+  `ptyxis --toggle-quake` directly retains the original
   visible/hidden toggle behavior.
 
 Window placement and animation remain the compositor's responsibility. In

@@ -113,13 +113,17 @@ pane 时会撤回通知。
   会复用该窗口，而不是创建普通窗口。
 - Quake 窗口不会参与普通的最近使用窗口选择、常规尺寸决策或会话持久化。
 - 标题栏和样式会明确标识它是 Quake 终端，以便与普通 Ptyxis 窗口区分。
-- Global Shortcuts portal 提供应用级全局快捷键，首选按键为 `Ctrl+grave`
-  （Ctrl 加反引号键）。已有的 portal 绑定会静默恢复；若尚无绑定，运行
-  `ptyxis --toggle-quake` 会请求创建绑定，此时桌面环境可能显示许可对话框。
+- 一个很小的 `ptyxis-quake-daemon` 进程负责持有 Global Shortcuts portal 会话，
+  首选按键为 `Ctrl+grave`（Ctrl 加反引号键）。它只会在首次使用 Quake 模式或在
+  首选项中明确启用后启动，并不包含终端或窗口实现。
+- 首次使用时，Ptyxis 会询问是否在登录时启动快捷键服务。Flatpak 构建通过
+  Background portal 注册，原生构建则使用当前用户的 XDG autostart 项。选择不
+  自启动时，快捷键在当前登录会话中仍然可用；之后可在首选项的“行为”页面修改。
+- 已有的 portal 绑定会静默恢复；若尚无绑定，daemon 会请求创建绑定，此时桌面
+  环境可能显示许可对话框。
 - 从 portal 激活快捷键时会使用合成器提供的 activation token。Quake 窗口隐藏或
   可见但未聚焦时，快捷键会将它带到前台；窗口已聚焦时则会隐藏它。不带
-  activation token 执行 `ptyxis --toggle-quake` 时，仍保持原有的显示／隐藏切换
-  行为。
+  直接执行 `ptyxis --toggle-quake` 时，仍保持原有的显示／隐藏切换行为。
 
 窗口位置和动画仍由合成器负责。尤其是 Wayland 协议不允许普通应用可靠地指定屏幕
 边缘的绝对位置，因此无法保证它在所有桌面上都能像合成器原生的下拉终端一样工作。

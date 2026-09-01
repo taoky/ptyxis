@@ -190,6 +190,18 @@
       <description>Restore tabs from previous session when starting Ptyxis</description>
     </key>
 
+    <key name="quake-autostart" type="b">
+      <default>false</default>
+      <summary>Start Quake Shortcut Service at Login</summary>
+      <description>Start the Quake global shortcut service when logging in</description>
+    </key>
+
+    <key name="quake-autostart-prompted" type="b">
+      <default>false</default>
+      <summary>Quake Autostart Prompt Shown</summary>
+      <description>Whether the user has answered the Quake shortcut service autostart prompt</description>
+    </key>
+
     <key name="select-to-copy" type="b">
       <default>false</default>
       <summary>Select to Copy</summary>

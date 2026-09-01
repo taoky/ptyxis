@@ -36,6 +36,7 @@
 #include "ptyxis-preferences-window.h"
 #include "ptyxis-profile-editor.h"
 #include "ptyxis-profile-row.h"
+#include "ptyxis-quake-service.h"
 #include "ptyxis-shortcut-row.h"
 #include "ptyxis-util.h"
 
@@ -82,6 +83,7 @@ struct _PtyxisPreferencesWindow
   GListModel           *preserve_directories;
   GtkListBox           *profiles_list_box;
   AdwSwitchRow         *restore_session;
+  AdwSwitchRow         *quake_autostart;
   GtkSwitch            *restore_window_size;
   AdwSpinRow           *default_rows;
   AdwSpinRow           *default_columns;
@@ -147,6 +149,8 @@ struct _PtyxisPreferencesWindow
   GtkListBox           *custom_links_list_box;
   AdwSwitchRow         *select_to_copy;
   AdwSwitchRow         *trim_trailing_spaces;
+  GCancellable         *quake_autostart_cancellable;
+  guint                 updating_quake_autostart : 1;
 };
 
 G_DEFINE_FINAL_TYPE (PtyxisPreferencesWindow, ptyxis_preferences_window, ADW_TYPE_PREFERENCES_WINDOW)
@@ -332,6 +336,98 @@ ptyxis_preferences_window_add_toast (GtkWidget  *widget,
                         NULL);
 
   adw_preferences_window_add_toast (ADW_PREFERENCES_WINDOW (self), toast);
+}
+
+typedef struct
+{
+  PtyxisPreferencesWindow *window;
+  gboolean                 enabled;
+} QuakeAutostartRequest;
+
+static void
+quake_autostart_request_free (QuakeAutostartRequest *request)
+{
+  g_clear_object (&request->window);
+  g_free (request);
+}
+
+static void
+ptyxis_preferences_window_quake_autostart_cb (GObject      *object,
+                                              GAsyncResult *result,
+                                              gpointer      user_data)
+{
+  QuakeAutostartRequest *request = user_data;
+  PtyxisPreferencesWindow *self = request->window;
+  PtyxisSettings *settings;
+  GSettings *gsettings;
+  g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_set_autostart_finish (result, &error) &&
+      g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+    {
+      quake_autostart_request_free (request);
+      return;
+    }
+
+  settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+  gsettings = ptyxis_settings_get_settings (settings);
+
+  if (error == NULL)
+    {
+      g_settings_set_boolean (gsettings,
+                              PTYXIS_QUAKE_AUTOSTART_KEY,
+                              request->enabled);
+      if (request->enabled)
+        ptyxis_quake_service_start ();
+    }
+  else
+    {
+      AdwToast *toast = adw_toast_new (error->message);
+
+      self->updating_quake_autostart = TRUE;
+      adw_switch_row_set_active (self->quake_autostart, !request->enabled);
+      self->updating_quake_autostart = FALSE;
+      adw_preferences_window_add_toast (ADW_PREFERENCES_WINDOW (self), toast);
+    }
+
+  gtk_widget_set_sensitive (GTK_WIDGET (self->quake_autostart), TRUE);
+  quake_autostart_request_free (request);
+}
+
+static void
+ptyxis_preferences_window_quake_autostart_changed_cb (AdwSwitchRow           *row,
+                                                      GParamSpec             *pspec,
+                                                      PtyxisPreferencesWindow *self)
+{
+  PtyxisSettings *settings;
+  GSettings *gsettings;
+  QuakeAutostartRequest *request;
+  gboolean enabled;
+
+  g_assert (ADW_IS_SWITCH_ROW (row));
+  g_assert (PTYXIS_IS_PREFERENCES_WINDOW (self));
+
+  if (self->updating_quake_autostart)
+    return;
+
+  enabled = adw_switch_row_get_active (row);
+  settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+  gsettings = ptyxis_settings_get_settings (settings);
+  g_settings_set_boolean (gsettings, PTYXIS_QUAKE_PROMPTED_KEY, TRUE);
+
+  request = g_new0 (QuakeAutostartRequest, 1);
+  request->window = g_object_ref (self);
+  request->enabled = enabled;
+
+  g_clear_object (&self->quake_autostart_cancellable);
+  self->quake_autostart_cancellable = g_cancellable_new ();
+  gtk_widget_set_sensitive (GTK_WIDGET (row), FALSE);
+  ptyxis_quake_service_set_autostart_async (
+    GTK_WINDOW (self),
+    enabled,
+    self->quake_autostart_cancellable,
+    ptyxis_preferences_window_quake_autostart_cb,
+    request);
 }
 
 static void
@@ -918,6 +1014,16 @@ ptyxis_preferences_window_constructed (GObject *object)
                           self->trim_trailing_spaces, "active",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
 
+  self->updating_quake_autostart = TRUE;
+  adw_switch_row_set_active (
+    self->quake_autostart,
+    g_settings_get_boolean (gsettings, PTYXIS_QUAKE_AUTOSTART_KEY));
+  self->updating_quake_autostart = FALSE;
+  g_signal_connect (self->quake_autostart,
+                    "notify::active",
+                    G_CALLBACK (ptyxis_preferences_window_quake_autostart_changed_cb),
+                    self);
+
   g_object_bind_property (settings, "default-columns",
                           self->default_columns, "value",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
@@ -1098,6 +1204,9 @@ ptyxis_preferences_window_dispose (GObject *object)
 {
   PtyxisPreferencesWindow *self = (PtyxisPreferencesWindow *)object;
 
+  if (self->quake_autostart_cancellable != NULL)
+    g_cancellable_cancel (self->quake_autostart_cancellable);
+  g_clear_object (&self->quake_autostart_cancellable);
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_PREFERENCES_WINDOW);
 
   g_clear_pointer (&self->default_palette_id, g_free);
@@ -1201,6 +1310,7 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, preserve_directories);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, preserve_directory);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, profiles_list_box);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_autostart);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, restore_session);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, restore_window_size);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, default_rows);

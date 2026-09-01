@@ -45,6 +45,7 @@ profiles, searchable tabs, and split terminal panes.
 %license COPYING
 %doc NEWS README.md docs/PACKAGING.md
 %{_bindir}/ptyxis
+%{_bindir}/ptyxis-quake-daemon
 %{_libexecdir}/ptyxis-agent
 %{_mandir}/man1/ptyxis.1*
 %{_datadir}/applications/org.gnome.Ptyxis.desktop
@@ -52,6 +53,7 @@ profiles, searchable tabs, and split terminal panes.
 %{_datadir}/glib-2.0/schemas/org.gnome.Ptyxis.gschema.xml
 %{_datadir}/icons/hicolor/*/apps/org.gnome.Ptyxis*.svg
 %{_datadir}/metainfo/org.gnome.Ptyxis.metainfo.xml
+%{_datadir}/ptyxis/org.gnome.Ptyxis.QuakeDaemon.desktop
 
 %changelog
 * Fri Aug 21 2026 Ptyxis snapshot builder <noreply@example.invalid> - 50.2-1

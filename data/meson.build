@@ -28,6 +28,26 @@ if desktop_utils.found()
   test('Validate desktop file', desktop_utils, args: [desktop_file])
 endif
 
+quake_autostart_config = configuration_data()
+quake_autostart_config.set('QUAKE_DAEMON', join_paths(get_option('prefix'), get_option('bindir'), 'ptyxis-quake-daemon'))
+quake_autostart_file_in = configure_file(
+          input: 'org.gnome.Ptyxis.QuakeDaemon.desktop.in.in',
+         output: 'org.gnome.Ptyxis.QuakeDaemon.desktop.in',
+  configuration: quake_autostart_config,
+)
+quake_autostart_file = i18n.merge_file(
+        input: quake_autostart_file_in,
+       output: '@0@.QuakeDaemon.desktop'.format(app_id),
+         type: 'desktop',
+       po_dir: '../po',
+      install: true,
+  install_dir: get_option('datadir') / 'ptyxis',
+)
+
+if desktop_utils.found()
+  test('Validate Quake autostart file', desktop_utils, args: [quake_autostart_file])
+endif
+
 appstream_config = configuration_data()
 appstream_config.set('APP_ID', app_id)
 appstream_config.set('APP_NAME', app_name)

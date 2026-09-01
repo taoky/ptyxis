@@ -57,3 +57,14 @@ terminal_copy_test = executable('test-terminal-copy',
   include_directories: [include_directories('..'), include_directories('../src')],
 )
 test('test-terminal-copy', terminal_copy_test, env: test_env)
+
+quake_service_test = executable('test-quake-service',
+  ['test-quake-service.c', '../src/ptyxis-quake-service.c'],
+  c_args: testsuite_c_args,
+  dependencies: [dependency('gtk4'), dependency('libportal-gtk4')],
+  include_directories: [include_directories('..'), include_directories('../src')],
+)
+test('test-quake-service', quake_service_test,
+  args: [join_paths(meson.project_build_root(), 'data', '@0@.QuakeDaemon.desktop'.format(app_id))],
+  env: test_env,
+)

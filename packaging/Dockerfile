@@ -17,6 +17,7 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
         "Build snapshot from the current repository." && \
     dpkg-buildpackage --build=binary --no-sign && \
     test -x debian/ptyxis/usr/bin/ptyxis && \
+    test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
     mkdir -p /out && cp /ptyxis_*.deb /out/
 
@@ -40,6 +41,7 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
         "Build snapshot from the current repository." && \
     dpkg-buildpackage --build=binary --no-sign && \
     test -x debian/ptyxis/usr/bin/ptyxis && \
+    test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
     mkdir -p /out && cp /ptyxis_*.deb /out/
 
@@ -91,6 +93,7 @@ RUN useradd --create-home builder && \
     chown -R builder:builder /pkgbuild /out && \
     su builder -c 'cd /pkgbuild && makepkg --cleanbuild --noconfirm' && \
     test -x /pkgbuild/pkg/ptyxis/usr/bin/ptyxis && \
+    test -x /pkgbuild/pkg/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -x /pkgbuild/pkg/ptyxis/usr/lib/ptyxis-agent -o \
          -x /pkgbuild/pkg/ptyxis/usr/libexec/ptyxis-agent && \
     find /pkgbuild -maxdepth 1 -type f -name '*.pkg.tar.*' -exec cp '{}' /out/ \;
