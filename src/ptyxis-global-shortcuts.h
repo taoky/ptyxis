@@ -17,5 +17,7 @@ PtyxisGlobalShortcuts *ptyxis_global_shortcuts_new          (const char         
 void                   ptyxis_global_shortcuts_register     (PtyxisGlobalShortcuts *self);
 void                   ptyxis_global_shortcuts_start        (PtyxisGlobalShortcuts *self);
 void                   ptyxis_global_shortcuts_ensure_bound (PtyxisGlobalShortcuts *self);
+void                   ptyxis_global_shortcuts_configure    (PtyxisGlobalShortcuts *self,
+                                                             const char            *parent_window);
 
 G_END_DECLS

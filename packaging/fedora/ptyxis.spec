@@ -50,6 +50,7 @@ profiles, searchable tabs, and split terminal panes.
 %{_mandir}/man1/ptyxis.1*
 %{_datadir}/applications/org.gnome.Ptyxis.desktop
 %{_datadir}/dbus-1/services/org.gnome.Ptyxis.service
+%{_datadir}/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service
 %{_datadir}/glib-2.0/schemas/org.gnome.Ptyxis.gschema.xml
 %{_datadir}/icons/hicolor/*/apps/org.gnome.Ptyxis*.svg
 %{_datadir}/metainfo/org.gnome.Ptyxis.metainfo.xml

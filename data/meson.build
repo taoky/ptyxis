@@ -85,4 +85,12 @@ configure_file(
     install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'),
 )
 
+configure_file(
+          input: 'org.gnome.Ptyxis.QuakeDaemon.service.in',
+         output: '@0@.QuakeDaemon.service'.format(app_id),
+  configuration: dbusconf,
+        install: true,
+    install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'),
+)
+
 subdir('icons')

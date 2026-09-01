@@ -40,16 +40,19 @@ struct _PtyxisGlobalShortcuts
   char            *session_handle;
   guint            response_subscription;
   guint            activated_subscription;
+  guint            changed_subscription;
   guint            portal_owner_subscription;
   guint            request_serial;
   RequestKind      request;
   guint            bound : 1;
   guint            bind_requested : 1;
+  guint            configure_requested : 1;
   guint            started : 1;
 };
 
 enum {
   ACTIVATED,
+  CHANGED,
   N_SIGNALS
 };
 
@@ -82,6 +85,36 @@ shortcuts_contains_quake (GVariant *shortcuts)
     }
 
   return FALSE;
+}
+
+static void
+shortcuts_emit_changed (PtyxisGlobalShortcuts *self,
+                        GVariant              *shortcuts)
+{
+  GVariantIter iter;
+  g_autoptr(GVariant) properties = NULL;
+  g_autofree char *shortcut_id = NULL;
+
+  if (shortcuts != NULL)
+    {
+      g_variant_iter_init (&iter, shortcuts);
+      while (g_variant_iter_next (&iter, "(s@a{sv})", &shortcut_id, &properties))
+        {
+          if (g_str_equal (shortcut_id, QUAKE_SHORTCUT_ID))
+            {
+              const char *description = NULL;
+
+              g_variant_lookup (properties, "trigger_description", "&s", &description);
+              g_signal_emit (self, signals[CHANGED], 0, description != NULL ? description : "");
+              return;
+            }
+
+          g_clear_pointer (&shortcut_id, g_free);
+          g_clear_pointer (&properties, g_variant_unref);
+        }
+    }
+
+  g_signal_emit (self, signals[CHANGED], 0, "");
 }
 
 static char *
@@ -198,6 +231,8 @@ portal_response_cb (GDBusConnection *connection,
       g_free (self->session_handle);
       self->session_handle = g_strdup (session_handle);
       ptyxis_global_shortcuts_list (self);
+      if (self->configure_requested)
+        ptyxis_global_shortcuts_configure (self, "");
     }
   else if (request == REQUEST_LIST_SHORTCUTS ||
            request == REQUEST_BIND_SHORTCUTS)
@@ -206,6 +241,7 @@ portal_response_cb (GDBusConnection *connection,
         g_variant_lookup_value (results, "shortcuts", G_VARIANT_TYPE ("a(sa{sv})"));
 
       self->bound = shortcuts_contains_quake (shortcuts);
+      shortcuts_emit_changed (self, shortcuts);
 
       if (request == REQUEST_LIST_SHORTCUTS &&
           !self->bound &&
@@ -352,6 +388,24 @@ activated_cb (GDBusConnection *connection,
 }
 
 static void
+shortcuts_changed_cb (GDBusConnection *connection,
+                      const char      *sender_name,
+                      const char      *object_path,
+                      const char      *interface_name,
+                      const char      *signal_name,
+                      GVariant        *parameters,
+                      gpointer         user_data)
+{
+  PtyxisGlobalShortcuts *self = user_data;
+  g_autoptr(GVariant) shortcuts = NULL;
+  const char *session_handle;
+
+  g_variant_get (parameters, "(&o@a(sa{sv}))", &session_handle, &shortcuts);
+  if (g_strcmp0 (session_handle, self->session_handle) == 0)
+    shortcuts_emit_changed (self, shortcuts);
+}
+
+static void
 portal_owner_changed_cb (GDBusConnection *connection,
                          const char      *sender_name,
                          const char      *object_path,
@@ -414,6 +468,13 @@ ptyxis_global_shortcuts_dispose (GObject *object)
           self->activated_subscription = 0;
         }
 
+      if (self->changed_subscription != 0)
+        {
+          g_dbus_connection_signal_unsubscribe (self->connection,
+                                                self->changed_subscription);
+          self->changed_subscription = 0;
+        }
+
       if (self->portal_owner_subscription != 0)
         {
           g_dbus_connection_signal_unsubscribe (self->connection,
@@ -449,6 +510,15 @@ ptyxis_global_shortcuts_class_init (PtyxisGlobalShortcutsClass *klass)
 
   signals[ACTIVATED] =
     g_signal_new ("activated",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE,
+                  1,
+                  G_TYPE_STRING | G_SIGNAL_TYPE_STATIC_SCOPE);
+  signals[CHANGED] =
+    g_signal_new ("changed",
                   G_TYPE_FROM_CLASS (klass),
                   G_SIGNAL_RUN_LAST,
                   0,
@@ -576,7 +646,8 @@ ptyxis_global_shortcuts_start (PtyxisGlobalShortcuts *self)
 
   self->started = TRUE;
   if (self->activated_subscription == 0)
-    self->activated_subscription =
+    {
+      self->activated_subscription =
       g_dbus_connection_signal_subscribe (self->connection,
                                           PORTAL_BUS_NAME,
                                           PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
@@ -587,6 +658,18 @@ ptyxis_global_shortcuts_start (PtyxisGlobalShortcuts *self)
                                           activated_cb,
                                           self,
                                           NULL);
+      self->changed_subscription =
+        g_dbus_connection_signal_subscribe (self->connection,
+                                            PORTAL_BUS_NAME,
+                                            PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
+                                            "ShortcutsChanged",
+                                            PORTAL_OBJECT_PATH,
+                                            NULL,
+                                            G_DBUS_SIGNAL_FLAGS_NONE,
+                                            shortcuts_changed_cb,
+                                            self,
+                                            NULL);
+    }
 
   handle_token = make_token ("create");
   session_token = make_token ("quake");
@@ -612,4 +695,35 @@ ptyxis_global_shortcuts_ensure_bound (PtyxisGlobalShortcuts *self)
       self->request == REQUEST_NONE &&
       !self->bound)
     ptyxis_global_shortcuts_bind (self);
+}
+
+void
+ptyxis_global_shortcuts_configure (PtyxisGlobalShortcuts *self,
+                                   const char            *parent_window)
+{
+  GVariantBuilder options;
+
+  g_return_if_fail (PTYXIS_IS_GLOBAL_SHORTCUTS (self));
+
+  self->configure_requested = TRUE;
+  if (self->connection == NULL || self->session_handle == NULL)
+    return;
+
+  self->configure_requested = FALSE;
+  g_variant_builder_init (&options, G_VARIANT_TYPE_VARDICT);
+  g_dbus_connection_call (self->connection,
+                          PORTAL_BUS_NAME,
+                          PORTAL_OBJECT_PATH,
+                          PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
+                          "ConfigureShortcuts",
+                          g_variant_new ("(os@a{sv})",
+                                         self->session_handle,
+                                         parent_window != NULL ? parent_window : "",
+                                         g_variant_builder_end (&options)),
+                          NULL,
+                          G_DBUS_CALL_FLAGS_NONE,
+                          -1,
+                          self->cancellable,
+                          NULL,
+                          NULL);
 }

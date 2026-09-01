@@ -201,6 +201,11 @@
       <summary>Quake Autostart Prompt Shown</summary>
       <description>Whether the user has answered the Quake shortcut service autostart prompt</description>
     </key>
+    <key name="quake-shortcut-description" type="s">
+      <default>''</default>
+      <summary>Current Quake global shortcut description</summary>
+      <description>The user-readable trigger description reported by the Global Shortcuts portal.</description>
+    </key>
 
     <key name="select-to-copy" type="b">
       <default>false</default>

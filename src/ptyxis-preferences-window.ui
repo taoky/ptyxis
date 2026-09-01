@@ -68,7 +68,7 @@
           <object class="AdwPreferencesGroup" id="opacity_group">
             <property name="visible">false</property>
             <child>
-              <object class="AdwActionRow">
+              <object class="AdwActionRow" id="quake_shortcut">
                 <property name="title" translatable="yes">Transparency</property>
                 <property name="subtitle" translatable="yes">Reduces the opacity of the background window</property>
                 <property name="activatable-widget">opacity</property>
@@ -402,6 +402,18 @@
               <object class="AdwSwitchRow" id="quake_autostart">
                 <property name="title" translatable="yes">Start Shortcut Service at Login</property>
                 <property name="subtitle" translatable="yes">Keep the global Quake shortcut available before Ptyxis is opened</property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwActionRow">
+                <property name="title" translatable="yes">Global Shortcut</property>
+                <property name="subtitle" translatable="yes">Configured securely by your desktop</property>
+                <child type="suffix">
+                  <object class="GtkButton" id="quake_change_shortcut">
+                    <property name="label" translatable="yes">Change Shortcut…</property>
+                    <property name="valign">center</property>
+                  </object>
+                </child>
               </object>
             </child>
           </object>

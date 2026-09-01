@@ -11,6 +11,7 @@
 #include "ptyxis-global-shortcuts.h"
 
 #define QUAKE_ACTION "toggle-quake"
+#define CONFIGURE_ACTION "configure-shortcut"
 
 typedef struct
 {
@@ -86,6 +87,18 @@ shortcuts_activated_cb (QuakeDaemon          *self,
 }
 
 static void
+shortcuts_changed_cb (QuakeDaemon          *self,
+                      const char           *description,
+                      PtyxisGlobalShortcuts *shortcuts)
+{
+  g_autoptr(GSettings) settings = g_settings_new (APP_SCHEMA_ID);
+
+  g_settings_set_string (settings,
+                         "quake-shortcut-description",
+                         description);
+}
+
+static void
 daemon_activate_cb (GApplication *application,
                     gpointer      user_data)
 {
@@ -101,11 +114,28 @@ daemon_activate_cb (GApplication *application,
                             "activated",
                             G_CALLBACK (shortcuts_activated_cb),
                             self);
+  g_signal_connect_swapped (self->shortcuts,
+                            "changed",
+                            G_CALLBACK (shortcuts_changed_cb),
+                            self);
   ptyxis_global_shortcuts_register (self->shortcuts);
   ptyxis_global_shortcuts_start (self->shortcuts);
   ptyxis_global_shortcuts_ensure_bound (self->shortcuts);
 
   g_application_hold (application);
+}
+
+static void
+configure_shortcut_cb (GSimpleAction *action,
+                       GVariant      *parameter,
+                       gpointer       user_data)
+{
+  QuakeDaemon *self = user_data;
+
+  if (self->shortcuts == NULL)
+    daemon_activate_cb (self->application, self);
+
+  ptyxis_global_shortcuts_configure (self->shortcuts, "");
 }
 
 int
@@ -122,6 +152,17 @@ main (int   argc,
 
   daemon_id = g_strconcat (APP_ID, ".QuakeDaemon", NULL);
   self.application = g_application_new (daemon_id, G_APPLICATION_DEFAULT_FLAGS);
+  {
+    g_autoptr(GSimpleAction) configure_action =
+      g_simple_action_new (CONFIGURE_ACTION, NULL);
+
+    g_signal_connect (configure_action,
+                      "activate",
+                      G_CALLBACK (configure_shortcut_cb),
+                      &self);
+    g_action_map_add_action (G_ACTION_MAP (self.application),
+                             G_ACTION (configure_action));
+  }
   g_signal_connect (self.application,
                     "activate",
                     G_CALLBACK (daemon_activate_cb),

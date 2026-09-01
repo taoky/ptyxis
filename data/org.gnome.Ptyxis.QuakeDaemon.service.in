@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=@app_id@.QuakeDaemon
+Exec=@bindir@/ptyxis-quake-daemon
