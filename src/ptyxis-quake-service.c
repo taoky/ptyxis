@@ -248,6 +248,7 @@ configure_daemon_appeared_cb (GDBusConnection *connection,
 {
   ConfigureDaemonWait *wait = user_data;
   g_autoptr(GTask) task = g_steal_pointer (&wait->task);
+  GCancellable *cancellable = g_task_get_cancellable (task);
   g_autofree char *daemon_id = g_strdup (name);
   g_autofree char *object_path = g_strdup_printf ("/%s/QuakeDaemon", APP_ID);
 
@@ -266,7 +267,7 @@ configure_daemon_appeared_cb (GDBusConnection *connection,
                           NULL,
                           G_DBUS_CALL_FLAGS_NONE,
                           -1,
-                          g_task_get_cancellable (task),
+                          cancellable,
                           configure_call_cb,
                           g_steal_pointer (&task));
 }
@@ -345,6 +346,7 @@ configure_bus_cb (GObject      *object,
   g_autoptr(GTask) task = user_data;
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(GError) error = NULL;
+  GCancellable *cancellable;
 
   connection = g_bus_get_finish (result, &error);
   if (connection == NULL)
@@ -352,6 +354,8 @@ configure_bus_cb (GObject      *object,
       g_task_return_error (task, g_steal_pointer (&error));
       return;
     }
+
+  cancellable = g_task_get_cancellable (task);
 
   g_dbus_connection_call (connection,
                           "org.freedesktop.portal.Desktop",
@@ -364,7 +368,7 @@ configure_bus_cb (GObject      *object,
                           G_VARIANT_TYPE ("(v)"),
                           G_DBUS_CALL_FLAGS_NONE,
                           -1,
-                          g_task_get_cancellable (task),
+                          cancellable,
                           configure_version_cb,
                           g_steal_pointer (&task));
 }
@@ -402,6 +406,7 @@ stop_bus_cb (GObject      *object,
   g_autoptr(GTask) task = user_data;
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(GError) error = NULL;
+  GCancellable *cancellable;
   g_autofree char *daemon_id = NULL;
   g_autofree char *object_path = NULL;
 
@@ -415,6 +420,7 @@ stop_bus_cb (GObject      *object,
   daemon_id = g_strconcat (APP_ID, ".QuakeDaemon", NULL);
   object_path = g_strdup_printf ("/%s/QuakeDaemon", APP_ID);
   g_strdelimit (object_path, ".", '/');
+  cancellable = g_task_get_cancellable (task);
   g_dbus_connection_call (connection,
                           daemon_id,
                           object_path,
@@ -427,7 +433,7 @@ stop_bus_cb (GObject      *object,
                           NULL,
                           G_DBUS_CALL_FLAGS_NO_AUTO_START,
                           -1,
-                          g_task_get_cancellable (task),
+                          cancellable,
                           configure_call_cb,
                           g_steal_pointer (&task));
 }
