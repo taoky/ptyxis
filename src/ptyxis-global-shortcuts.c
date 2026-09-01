@@ -645,6 +645,10 @@ ptyxis_global_shortcuts_start (PtyxisGlobalShortcuts *self)
     return;
 
   self->started = TRUE;
+  /* A newly-created session has no in-memory shortcuts yet.  Ask the
+   * portal to restore the application's persisted bindings through
+   * BindShortcuts after ListShortcuts completes. */
+  self->bind_requested = TRUE;
   if (self->activated_subscription == 0)
     {
       self->activated_subscription =
