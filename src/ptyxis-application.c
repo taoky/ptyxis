@@ -421,7 +421,9 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
                                  (gpointer *)&self->quake_window);
     }
 
-  if (gtk_widget_get_visible (GTK_WIDGET (self->quake_window)))
+  if (gtk_widget_get_visible (GTK_WIDGET (self->quake_window)) &&
+      (activation_token == NULL ||
+       gtk_window_is_active (GTK_WINDOW (self->quake_window))))
     {
       gtk_widget_set_visible (GTK_WIDGET (self->quake_window), FALSE);
     }
