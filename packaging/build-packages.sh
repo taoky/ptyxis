@@ -158,6 +158,7 @@ build_native() {
 build_flatpak() {
   local flatpak_arch
   local bundle
+  local debug_bundle
   local repo="$output_root/flatpak/repo"
   local -a state_args=()
 
@@ -170,6 +171,7 @@ build_flatpak() {
   flatpak_arch=$(flatpak --default-arch)
   mkdir -p "$output_root/flatpak"
   bundle="$output_root/flatpak/ptyxis-${flatpak_version}-${flatpak_arch}.flatpak"
+  debug_bundle="$output_root/flatpak/ptyxis-debug-${flatpak_version}-${flatpak_arch}.flatpak"
 
   if [[ -n "$flatpak_builder_state_dir" ]]; then
     mkdir -p "$flatpak_builder_state_dir"
@@ -188,6 +190,11 @@ build_flatpak() {
     "$repo" \
     "$bundle" \
     org.gnome.Ptyxis
+  flatpak build-bundle \
+    --runtime \
+    "$repo" \
+    "$debug_bundle" \
+    org.gnome.Ptyxis.Debug
 }
 
 case "$target" in

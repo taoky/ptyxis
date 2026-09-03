@@ -20,7 +20,8 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
     test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -f debian/ptyxis/usr/share/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
-    mkdir -p /out && cp /ptyxis_*.deb /out/
+    test -f /ptyxis-dbgsym_*.deb && \
+    mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.deb /out/
 
 FROM scratch AS export-debian
 COPY --from=debian-build /out/ /
@@ -45,7 +46,8 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
     test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -f debian/ptyxis/usr/share/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
-    mkdir -p /out && cp /ptyxis_*.deb /out/
+    test -f /ptyxis-dbgsym_*.deb && \
+    mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.deb /out/
 
 FROM scratch AS export-ubuntu
 COPY --from=ubuntu-build /out/ /

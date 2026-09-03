@@ -8,11 +8,11 @@ Arch Linux, plus a Flatpak bundle.
 
 | Target | Build environment | Artifact |
 |---|---|---|
-| Debian | Debian sid | `.deb` |
-| Ubuntu | Ubuntu 26.04 | `.deb` |
+| Debian | Debian sid | `.deb` and `-dbgsym.deb` |
+| Ubuntu | Ubuntu 26.04 | `.deb` and `-dbgsym.deb` |
 | Fedora | Fedora 44 | `.rpm` |
 | Arch Linux | current rolling image | `.pkg.tar.zst` |
-| Flatpak | GNOME 50 runtime | `.flatpak` |
+| Flatpak | GNOME 50 runtime | application and `.Debug` extension bundles |
 
 The current source requires GLib 2.80, GTK 4.14, libadwaita 1.8, JSON-GLib
 1.6, VTE 0.79, and the GTK 4 libportal backend. Debian 13 does not provide the
@@ -81,7 +81,9 @@ Build every target sequentially:
 Native artifacts are written below a versioned directory such as
 `dist/fedora/git20260821.28c8c32/`. Flatpak output is written to
 `dist/flatpak/`, and its local OSTree repository is retained at
-`dist/flatpak/repo/`.
+`dist/flatpak/repo/`. Debian and Ubuntu builds include a `ptyxis-dbgsym`
+package. Flatpak builds include a separate `ptyxis-debug-*.flatpak` bundle
+containing the `org.gnome.Ptyxis.Debug` extension.
 
 The containers download build dependencies from their distribution mirrors.
 Flatpak requires Flathub for the GNOME SDK and runtime:
@@ -122,6 +124,7 @@ sudo apt install ./dist/debian/gitYYYYMMDD.SHA/ptyxis_*.deb
 ```
 
 Use `dist/ubuntu/` instead for an Ubuntu build.
+Install the matching `ptyxis-dbgsym_*.deb` when collecting a backtrace.
 
 Fedora:
 
@@ -138,9 +141,18 @@ sudo pacman -U ./dist/arch/gitYYYYMMDD.SHA/ptyxis-*.pkg.tar.zst
 Flatpak:
 
 ```sh
-flatpak install --user ./dist/flatpak/ptyxis-*.flatpak
+flatpak install --user ./dist/flatpak/ptyxis-[0-9]*.flatpak
 flatpak run org.gnome.Ptyxis
 ```
+
+To collect a backtrace, install both the application bundle and its matching
+debug extension:
+
+```sh
+flatpak install --user ./dist/flatpak/ptyxis-debug-*.flatpak
+```
+
+The extension is selected automatically when debugging the application.
 
 Because these packages use the official native package name and application
 ID, installing them can replace a distribution-provided Ptyxis build. The

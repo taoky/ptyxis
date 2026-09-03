@@ -114,7 +114,7 @@ jobs:
             dist/flatpak-builder-state
           key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
 
-      - name: Upload Flatpak bundle
+      - name: Upload Flatpak bundles
         uses: actions/upload-artifact@v7
         with:
           name: package-flatpak
