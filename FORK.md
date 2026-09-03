@@ -213,3 +213,28 @@ Areas that especially need broader manual testing include:
 
 Do not treat the existence of a build or unit test as evidence that all GUI,
 session, compositor, or packaging paths are production-ready.
+
+## VTE limitations and workarounds
+
+Ptyxis uses VTE for terminal input and text selection, so some behavior cannot
+currently be fixed in Ptyxis alone:
+
+- VTE does not encode `Ctrl+Backspace` as a distinct key in the tested setup.
+  Fish receives it as `Ctrl+H`, so its normal `Ctrl+Backspace` binding cannot
+  recognize the key. Fish users who want token deletion can add the following
+  binding to `~/.config/fish/config.fish` or a file below
+  `~/.config/fish/conf.d/`:
+
+  ```fish
+  bind ctrl-h backward-kill-token
+  ```
+
+  This is a workaround rather than equivalent key reporting: it also changes
+  the behavior of an actual `Ctrl+H` received by every fish session that loads
+  the binding.
+- VTE's double-click word selection uses a global set of word-character
+  exceptions. It cannot both select a complete URL such as
+  `https://example.com` and treat the colon in ordinary text such as `foo:bar`
+  as a word boundary. For links recognized by Ptyxis, right-click the URL and
+  use **Open Link** or **Copy Link** instead of relying on double-click
+  selection.

@@ -177,3 +177,24 @@ Meson 构建和部分软件包构建。这些检查并不代表整个 fork 已�
 
 构建或单元测试能够通过，并不表示所有 GUI、会话、合成器或打包路径都已达到可用于
 生产环境的程度。
+
+## VTE 限制与替代方案
+
+Ptyxis 使用 VTE 处理终端输入和文本选择，因此以下行为目前无法只在 Ptyxis 中
+修复：
+
+- 在已测试的环境中，VTE 不会为 `Ctrl+Backspace` 编码一个可单独识别的按键序列。
+  fish 收到的是 `Ctrl+H`，因此无法匹配其正常的 `Ctrl+Backspace` 绑定。希望用该
+  按键删除 token 的 fish 用户，可以把以下绑定加入
+  `~/.config/fish/config.fish` 或 `~/.config/fish/conf.d/` 下的文件：
+
+  ```fish
+  bind ctrl-h backward-kill-token
+  ```
+
+  这只是替代方案，并不等同于正确识别按键：所有加载该绑定的 fish 会话收到真正的
+  `Ctrl+H` 时，行为也会一并改变。
+- VTE 的双击选词只能使用一套全局字符例外规则，无法既把
+  `https://example.com` 之类的 URL 完整选中，又把普通文本 `foo:bar` 中的冒号视为
+  单词边界。对于 Ptyxis 已识别的链接，可以右键点击 URL，使用“打开链接”或
+  “复制链接”，而不要依赖双击选中。
