@@ -426,6 +426,28 @@ ptyxis_window_setup_menu_cb (PtyxisWindow *self,
     adw_tab_view_set_selected_page (view, page);
 }
 
+static PtyxisWindow *
+ptyxis_window_new_for_detach (PtyxisWindow *self)
+{
+  PtyxisWindow *other;
+  int height;
+  int width;
+
+  g_assert (PTYXIS_IS_WINDOW (self));
+
+  other = g_object_new (PTYXIS_TYPE_WINDOW,
+                        "application", PTYXIS_APPLICATION_DEFAULT,
+                        NULL);
+
+  width = gtk_widget_get_width (GTK_WIDGET (self));
+  height = gtk_widget_get_height (GTK_WIDGET (self));
+
+  if (width > 0 && height > 0)
+    gtk_window_set_default_size (GTK_WINDOW (other), width, height);
+
+  return other;
+}
+
 static AdwTabView *
 ptyxis_window_create_window_cb (PtyxisWindow *self,
                                 AdwTabView   *tab_view)
@@ -434,10 +456,7 @@ ptyxis_window_create_window_cb (PtyxisWindow *self,
 
   g_assert (PTYXIS_IS_WINDOW (self));
 
-  other = g_object_new (PTYXIS_TYPE_WINDOW,
-                        "application", PTYXIS_APPLICATION_DEFAULT,
-                        NULL);
-
+  other = ptyxis_window_new_for_detach (self);
   gtk_window_present (GTK_WINDOW (other));
 
   return other->tab_view;
@@ -947,9 +966,7 @@ ptyxis_window_detach_action (GtkWidget  *widget,
 
   tab_page = adw_tab_view_get_page (self->tab_view, GTK_WIDGET (tab));
 
-  new_window = g_object_new (PTYXIS_TYPE_WINDOW,
-                             "application", PTYXIS_APPLICATION_DEFAULT,
-                             NULL);
+  new_window = ptyxis_window_new_for_detach (self);
   adw_tab_view_transfer_page (self->tab_view, tab_page, new_window->tab_view, 0);
 
   gtk_window_present (GTK_WINDOW (new_window));
