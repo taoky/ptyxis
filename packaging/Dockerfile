@@ -46,8 +46,8 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
     test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -f debian/ptyxis/usr/share/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
-    test -f /ptyxis-dbgsym_*.deb && \
-    mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.deb /out/
+    test -f /ptyxis-dbgsym_*.ddeb && \
+    mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.ddeb /out/
 
 FROM scratch AS export-ubuntu
 COPY --from=ubuntu-build /out/ /
