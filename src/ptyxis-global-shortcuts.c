@@ -406,6 +406,25 @@ shortcuts_changed_cb (GDBusConnection *connection,
 }
 
 static void
+ptyxis_global_shortcuts_reset_session (PtyxisGlobalShortcuts *self)
+{
+  g_assert (PTYXIS_IS_GLOBAL_SHORTCUTS (self));
+
+  if (self->response_subscription != 0)
+    {
+      g_dbus_connection_signal_unsubscribe (self->connection,
+                                            self->response_subscription);
+      self->response_subscription = 0;
+    }
+
+  self->request = REQUEST_NONE;
+  self->request_serial++;
+  self->bound = FALSE;
+  self->started = FALSE;
+  g_clear_pointer (&self->session_handle, g_free);
+}
+
+static void
 portal_owner_changed_cb (GDBusConnection *connection,
                          const char      *sender_name,
                          const char      *object_path,
@@ -423,22 +442,13 @@ portal_owner_changed_cb (GDBusConnection *connection,
   if (!g_str_equal (name, PORTAL_BUS_NAME))
     return;
 
-  if (new_owner[0] == '\0')
-    {
-      if (self->response_subscription != 0)
-        {
-          g_dbus_connection_signal_unsubscribe (connection,
-                                                self->response_subscription);
-          self->response_subscription = 0;
-        }
+  /* Sessions and host Registry registrations belong to a particular portal
+   * owner. Reset even for a direct old-owner to new-owner transition so the
+   * replacement process gets a fresh registration and session. */
+  ptyxis_global_shortcuts_reset_session (self);
 
-      self->request = REQUEST_NONE;
-      self->request_serial++;
-      self->bound = FALSE;
-      self->started = FALSE;
-      g_clear_pointer (&self->session_handle, g_free);
-      return;
-    }
+  if (new_owner[0] == '\0')
+    return;
 
   ptyxis_global_shortcuts_register_app_id (self);
   ptyxis_global_shortcuts_start (self);
