@@ -399,6 +399,14 @@
           <object class="AdwPreferencesGroup">
             <property name="title" translatable="yes">Quake Mode</property>
             <child>
+              <object class="AdwActionRow" id="quake_manual_shortcut">
+                <property name="title" translatable="yes">Set a Custom Shortcut</property>
+                <property name="subtitle" translatable="yes">In your desktop's keyboard shortcut settings, run: ptyxis --toggle-quake</property>
+                <property name="use-markup">false</property>
+                <property name="visible">false</property>
+              </object>
+            </child>
+            <child>
               <object class="AdwActionRow" id="quake_service_status">
                 <property name="title" translatable="yes">Shortcut Service</property>
                 <property name="subtitle" translatable="yes">Stopped</property>

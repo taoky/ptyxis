@@ -7,18 +7,74 @@
 
 #include <gio/gio.h>
 #include <glib/gi18n.h>
+#include <stdlib.h>
 
 #include "ptyxis-global-shortcuts.h"
 
 #define QUAKE_ACTION "toggle-quake"
 #define CONFIGURE_ACTION "configure-shortcut"
 #define QUIT_ACTION "quit"
+#define PORTAL_BUS_NAME "org.freedesktop.portal.Desktop"
+#define PORTAL_OBJECT_PATH "/org/freedesktop/portal/desktop"
+#define PORTAL_GLOBAL_SHORTCUTS_INTERFACE "org.freedesktop.portal.GlobalShortcuts"
 
 typedef struct
 {
   GApplication          *application;
   PtyxisGlobalShortcuts *shortcuts;
 } QuakeDaemon;
+
+static gboolean
+is_x11_session (void)
+{
+  const char *session_type = g_getenv ("XDG_SESSION_TYPE");
+  const char *wayland_display = g_getenv ("WAYLAND_DISPLAY");
+  const char *x11_display = g_getenv ("DISPLAY");
+
+  if (g_strcmp0 (session_type, "x11") == 0)
+    return TRUE;
+
+  if (g_strcmp0 (session_type, "wayland") == 0)
+    return FALSE;
+
+  return (wayland_display == NULL || wayland_display[0] == '\0') &&
+         x11_display != NULL && x11_display[0] != '\0';
+}
+
+static gboolean
+global_shortcuts_supported (void)
+{
+  g_autoptr(GDBusConnection) connection = NULL;
+  g_autoptr(GVariant) reply = NULL;
+  g_autoptr(GVariant) value = NULL;
+  g_autoptr(GVariant) inner = NULL;
+  g_autoptr(GError) error = NULL;
+
+  connection = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, &error);
+  if (connection == NULL)
+    return FALSE;
+
+  reply = g_dbus_connection_call_sync (connection,
+                                       PORTAL_BUS_NAME,
+                                       PORTAL_OBJECT_PATH,
+                                       "org.freedesktop.DBus.Properties",
+                                       "Get",
+                                       g_variant_new ("(ss)",
+                                                      PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
+                                                      "version"),
+                                       G_VARIANT_TYPE ("(v)"),
+                                       G_DBUS_CALL_FLAGS_NONE,
+                                       3000,
+                                       NULL,
+                                       &error);
+  if (reply == NULL)
+    return FALSE;
+
+  g_variant_get (reply, "(@v)", &value);
+  inner = g_variant_get_variant (value);
+  return g_variant_is_of_type (inner, G_VARIANT_TYPE_UINT32) &&
+         g_variant_get_uint32 (inner) >= 1;
+}
 
 static char *
 application_object_path (void)
@@ -155,6 +211,9 @@ main (int   argc,
   g_autofree char *daemon_id = NULL;
   QuakeDaemon self = {0};
   int ret;
+
+  if (is_x11_session () || !global_shortcuts_supported ())
+    return EXIT_SUCCESS;
 
   bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");

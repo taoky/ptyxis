@@ -10,12 +10,19 @@
 #include <libportal/portal.h>
 #include <libportal-gtk4/portal-gtk4.h>
 
+#ifdef GDK_WINDOWING_X11
+# include <gdk/x11/gdkx.h>
+#endif
+
 #include "ptyxis-quake-service.h"
 
 #define QUAKE_DAEMON_PATH BINDIR "/ptyxis-quake-daemon"
 #define QUAKE_AUTOSTART_TEMPLATE PKGDATADIR "/" APP_ID ".QuakeDaemon.desktop"
 #define QUAKE_CONFIGURE_ACTION "configure-shortcut"
 #define QUAKE_QUIT_ACTION "quit"
+#define PORTAL_BUS_NAME "org.freedesktop.portal.Desktop"
+#define PORTAL_OBJECT_PATH "/org/freedesktop/portal/desktop"
+#define PORTAL_GLOBAL_SHORTCUTS_INTERFACE "org.freedesktop.portal.GlobalShortcuts"
 
 typedef struct
 {
@@ -31,11 +38,124 @@ portal_request_free (PortalRequest *request)
   g_free (request);
 }
 
+gboolean
+ptyxis_quake_service_is_available (void)
+{
+#ifdef GDK_WINDOWING_X11
+  GdkDisplay *display = gdk_display_get_default ();
+
+  if (display != NULL && GDK_IS_X11_DISPLAY (display))
+    return FALSE;
+#endif
+
+  return TRUE;
+}
+
+static void
+check_supported_call_cb (GObject      *object,
+                         GAsyncResult *result,
+                         gpointer      user_data)
+{
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GVariant) reply = NULL;
+  g_autoptr(GVariant) value = NULL;
+  g_autoptr(GVariant) inner = NULL;
+  g_autoptr(GError) error = NULL;
+
+  reply = g_dbus_connection_call_finish (G_DBUS_CONNECTION (object), result, &error);
+  if (reply == NULL)
+    {
+      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        g_task_return_error (task, g_steal_pointer (&error));
+      else
+        g_task_return_boolean (task, FALSE);
+      return;
+    }
+
+  g_variant_get (reply, "(@v)", &value);
+  inner = g_variant_get_variant (value);
+  g_task_return_boolean (task,
+                         g_variant_is_of_type (inner, G_VARIANT_TYPE_UINT32) &&
+                         g_variant_get_uint32 (inner) >= 1);
+}
+
+static void
+check_supported_bus_cb (GObject      *object,
+                        GAsyncResult *result,
+                        gpointer      user_data)
+{
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GDBusConnection) connection = NULL;
+  g_autoptr(GError) error = NULL;
+  GCancellable *cancellable;
+
+  connection = g_bus_get_finish (result, &error);
+  if (connection == NULL)
+    {
+      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        g_task_return_error (task, g_steal_pointer (&error));
+      else
+        g_task_return_boolean (task, FALSE);
+      return;
+    }
+
+  cancellable = g_task_get_cancellable (task);
+  g_dbus_connection_call (connection,
+                          PORTAL_BUS_NAME,
+                          PORTAL_OBJECT_PATH,
+                          "org.freedesktop.DBus.Properties",
+                          "Get",
+                          g_variant_new ("(ss)",
+                                         PORTAL_GLOBAL_SHORTCUTS_INTERFACE,
+                                         "version"),
+                          G_VARIANT_TYPE ("(v)"),
+                          G_DBUS_CALL_FLAGS_NONE,
+                          -1,
+                          cancellable,
+                          check_supported_call_cb,
+                          g_steal_pointer (&task));
+}
+
+void
+ptyxis_quake_service_check_supported_async (GCancellable        *cancellable,
+                                             GAsyncReadyCallback  callback,
+                                             gpointer             user_data)
+{
+  GTask *task = g_task_new (NULL, cancellable, callback, user_data);
+
+  g_task_set_source_tag (task, ptyxis_quake_service_check_supported_async);
+  if (!ptyxis_quake_service_is_available ())
+    {
+      g_task_return_boolean (task, FALSE);
+      g_object_unref (task);
+      return;
+    }
+
+  g_bus_get (G_BUS_TYPE_SESSION,
+             cancellable,
+             check_supported_bus_cb,
+             task);
+}
+
+gboolean
+ptyxis_quake_service_check_supported_finish (GAsyncResult  *result,
+                                              GError       **error)
+{
+  g_return_val_if_fail (g_task_is_valid (result, NULL), FALSE);
+  g_return_val_if_fail (g_task_get_source_tag (G_TASK (result)) ==
+                        ptyxis_quake_service_check_supported_async, FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
+}
+
 void
 ptyxis_quake_service_start (void)
 {
   g_autoptr(GSubprocess) subprocess = NULL;
   g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_is_available ())
+    return;
 
   subprocess = g_subprocess_new (G_SUBPROCESS_FLAGS_NONE,
                                  &error,

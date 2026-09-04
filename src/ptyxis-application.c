@@ -42,6 +42,15 @@
 #define PORTAL_OBJECT_PATH "/org/freedesktop/portal/desktop"
 #define PORTAL_SETTINGS_INTERFACE "org.freedesktop.portal.Settings"
 
+typedef enum
+{
+  QUAKE_SUPPORT_UNKNOWN,
+  QUAKE_SUPPORT_CHECKING,
+  QUAKE_SUPPORT_SUPPORTED,
+  QUAKE_SUPPORT_UNSUPPORTED,
+  QUAKE_SUPPORT_UNSUPPORTED_NOTIFIED,
+} QuakeSupport;
+
 struct _PtyxisApplication
 {
   AdwApplication       parent_instance;
@@ -62,6 +71,7 @@ struct _PtyxisApplication
   guint                maximize : 1;
   guint                fullscreen : 1;
   guint                quake_prompt_active : 1;
+  QuakeSupport         quake_support;
 };
 
 static void ptyxis_application_about             (GSimpleAction *action,
@@ -413,7 +423,7 @@ get_current_window (PtyxisApplication *self)
 
 static void
 ptyxis_application_toggle_quake (PtyxisApplication *self,
-                                  gboolean           from_global_shortcut)
+                                  gboolean           present_if_inactive)
 {
   g_assert (PTYXIS_IS_APPLICATION (self));
 
@@ -426,7 +436,7 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
     }
 
   if (gtk_widget_get_visible (GTK_WIDGET (self->quake_window)) &&
-      (!from_global_shortcut ||
+      (!present_if_inactive ||
        gtk_window_is_active (GTK_WINDOW (self->quake_window))))
     {
       gtk_widget_set_visible (GTK_WIDGET (self->quake_window), FALSE);
@@ -489,6 +499,26 @@ ptyxis_application_show_quake_service_error (PtyxisApplication *self,
     adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (parent));
   else
     g_warning ("Quake shortcut service unavailable: %s", error->message);
+}
+
+static void
+ptyxis_application_show_manual_quake_shortcut (PtyxisApplication *self)
+{
+  AdwAlertDialog *dialog;
+
+  g_assert (PTYXIS_IS_APPLICATION (self));
+
+  if (self->quake_support == QUAKE_SUPPORT_UNSUPPORTED_NOTIFIED)
+    return;
+
+  self->quake_support = QUAKE_SUPPORT_UNSUPPORTED_NOTIFIED;
+  dialog = ADW_ALERT_DIALOG (
+    adw_alert_dialog_new (_("Global Shortcuts Unavailable"),
+                          _("Your desktop does not provide the Global Shortcuts portal. Set a custom keyboard shortcut to run “ptyxis --toggle-quake” instead.")));
+  adw_alert_dialog_add_response (dialog, "close", _("Close"));
+  adw_alert_dialog_set_default_response (dialog, "close");
+  adw_alert_dialog_set_close_response (dialog, "close");
+  adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (self->quake_window));
 }
 
 static void
@@ -579,6 +609,9 @@ ptyxis_application_ensure_quake_service (PtyxisApplication *self)
 
   g_assert (PTYXIS_IS_APPLICATION (self));
 
+  if (!ptyxis_quake_service_is_available ())
+    return;
+
   settings = ptyxis_settings_get_settings (self->settings);
   if (g_settings_get_boolean (settings, PTYXIS_QUAKE_PROMPTED_KEY))
     {
@@ -608,6 +641,76 @@ ptyxis_application_ensure_quake_service (PtyxisApplication *self)
                            NULL,
                            ptyxis_application_quake_prompt_cb,
                            g_object_ref (self));
+}
+
+static void
+ptyxis_application_check_quake_support_cb (GObject      *object,
+                                            GAsyncResult *result,
+                                            gpointer      user_data)
+{
+  g_autoptr(PtyxisApplication) self = user_data;
+  g_autoptr(GError) error = NULL;
+  gboolean supported;
+
+  supported = ptyxis_quake_service_check_supported_finish (result, &error);
+
+  if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+    {
+      self->quake_support = QUAKE_SUPPORT_UNKNOWN;
+      return;
+    }
+
+  if (supported)
+    {
+      self->quake_support = QUAKE_SUPPORT_SUPPORTED;
+      ptyxis_application_ensure_quake_service (self);
+    }
+  else
+    {
+      self->quake_support = QUAKE_SUPPORT_UNSUPPORTED;
+      ptyxis_quake_service_stop_async (NULL, NULL, NULL);
+      ptyxis_application_show_manual_quake_shortcut (self);
+    }
+}
+
+static void
+ptyxis_application_check_quake_support (PtyxisApplication *self)
+{
+  g_assert (PTYXIS_IS_APPLICATION (self));
+
+  if (self->quake_support == QUAKE_SUPPORT_SUPPORTED)
+    {
+      ptyxis_application_ensure_quake_service (self);
+      return;
+    }
+
+  if (self->quake_support == QUAKE_SUPPORT_UNSUPPORTED ||
+      self->quake_support == QUAKE_SUPPORT_UNSUPPORTED_NOTIFIED)
+    {
+      ptyxis_application_show_manual_quake_shortcut (self);
+      return;
+    }
+
+  if (self->quake_support == QUAKE_SUPPORT_CHECKING)
+    return;
+
+  self->quake_support = QUAKE_SUPPORT_CHECKING;
+  ptyxis_quake_service_check_supported_async (
+    NULL,
+    ptyxis_application_check_quake_support_cb,
+    g_object_ref (self));
+}
+
+static void
+ptyxis_application_stop_x11_quake_service_cb (GObject      *object,
+                                                GAsyncResult *result,
+                                                gpointer      user_data)
+{
+  g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_stop_finish (result, &error) &&
+      !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+    g_debug ("Quake shortcut service was not running: %s", error->message);
 }
 
 static void
@@ -721,8 +824,20 @@ ptyxis_application_command_line (GApplication            *app,
           return EXIT_FAILURE;
         }
 
-      ptyxis_application_toggle_quake (self, FALSE);
-      ptyxis_application_ensure_quake_service (self);
+      if (ptyxis_quake_service_is_available () &&
+          self->quake_support != QUAKE_SUPPORT_UNSUPPORTED &&
+          self->quake_support != QUAKE_SUPPORT_UNSUPPORTED_NOTIFIED)
+        {
+          ptyxis_application_toggle_quake (self, FALSE);
+          ptyxis_application_check_quake_support (self);
+        }
+      else
+        {
+          /* Desktop shortcuts may provide startup-notification or activation
+           * data through GtkApplication. Let the window system decide whether
+           * to honor the resulting presentation request. */
+          ptyxis_application_toggle_quake (self, TRUE);
+        }
       return EXIT_SUCCESS;
     }
 
@@ -1175,6 +1290,11 @@ ptyxis_application_startup (GApplication *application)
     }
 
   G_APPLICATION_CLASS (ptyxis_application_parent_class)->startup (application);
+
+  if (!ptyxis_quake_service_is_available ())
+    ptyxis_quake_service_stop_async (NULL,
+                                     ptyxis_application_stop_x11_quake_service_cb,
+                                     NULL);
 
   if ((sandbox_agent = ptyxis_application_should_sandbox_agent (self)))
     timeout_msec = G_MAXINT;

@@ -124,10 +124,35 @@ executable('ptyxis', ptyxis_sources + ptyxis_agent_ipc,
   include_directories: ptyxis_include_directories,
 )
 
-executable('ptyxis-quake-daemon',
+quake_daemon = executable('ptyxis-quake-daemon',
   ['ptyxis-quake-daemon.c', 'ptyxis-global-shortcuts.c'],
   dependencies: [dependency('gio-2.0', version: glib_req)],
   install: true,
   c_args: ptyxis_c_args,
   include_directories: include_directories('.', '..'),
+)
+
+test('test-quake-daemon-x11', quake_daemon,
+  env: [
+    'XDG_SESSION_TYPE=x11',
+    'WAYLAND_DISPLAY=',
+    'DISPLAY=:99',
+  ],
+)
+
+test('test-quake-daemon-x11-fallback', quake_daemon,
+  env: [
+    'XDG_SESSION_TYPE=',
+    'WAYLAND_DISPLAY=',
+    'DISPLAY=:99',
+  ],
+)
+
+test('test-quake-daemon-without-portal', quake_daemon,
+  env: [
+    'XDG_SESSION_TYPE=wayland',
+    'WAYLAND_DISPLAY=wayland-0',
+    'DISPLAY=',
+    'DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/ptyxis-nonexistent-session-bus',
+  ],
 )

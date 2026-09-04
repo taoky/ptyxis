@@ -13,6 +13,12 @@ G_BEGIN_DECLS
 #define PTYXIS_QUAKE_PROMPTED_KEY  "quake-autostart-prompted"
 #define PTYXIS_QUAKE_SHORTCUT_DESCRIPTION_KEY "quake-shortcut-description"
 
+gboolean ptyxis_quake_service_is_available         (void);
+void     ptyxis_quake_service_check_supported_async(GCancellable         *cancellable,
+                                                     GAsyncReadyCallback   callback,
+                                                     gpointer              user_data);
+gboolean ptyxis_quake_service_check_supported_finish(GAsyncResult        *result,
+                                                      GError             **error);
 void     ptyxis_quake_service_start                (void);
 void     ptyxis_quake_service_set_autostart_async  (GtkWindow            *parent,
                                                      gboolean              enabled,

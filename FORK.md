@@ -134,27 +134,37 @@ has not been comprehensively tested.
   ordinary sizing decisions, and session persistence.
 - Its header bar and styling identify it as a Quake terminal so it is visually
   distinguishable from a normal Ptyxis window.
-- A small `ptyxis-quake-daemon` process holds the Global Shortcuts portal
-  session, with `Ctrl+grave` (Ctrl plus the grave-accent key) as its preferred
-  trigger. It starts only after Quake mode is first used or explicitly enabled
-  in Preferences, and contains no terminal or window implementation.
-- On first use, Ptyxis asks whether the shortcut service should start at
-  login. Flatpak builds use the Background portal; native builds use a
-  per-user XDG autostart entry. Declining still keeps the shortcut available
+- On Wayland, a small `ptyxis-quake-daemon` process holds the Global Shortcuts
+  portal session, with `Ctrl+grave` (Ctrl plus the grave-accent key) as its
+  preferred trigger. It starts only after Quake mode is first used or
+  explicitly enabled in Preferences, and contains no terminal or window
+  implementation.
+- On first use under Wayland, Ptyxis asks whether the shortcut service should
+  start at login. Flatpak builds use the Background portal; native builds use
+  a per-user XDG autostart entry. Declining still keeps the shortcut available
   for the current login, and the choice can be changed later under Behavior in
   Preferences.
-- Existing portal bindings are restored silently; if none exists, the daemon
-  requests the binding and the desktop may show a permission dialog.
-- Preferences provides a **Change Shortcut…** button which asks the version 2
-  Global Shortcuts portal to show its trusted shortcut configuration UI.
-  The same section can start or stop the daemon for the current login;
-  daemon-dependent controls are disabled while it is stopped. This does not
-  change the separate login-autostart preference.
-- Portal activations use the compositor-provided activation token. If the
-  Quake window is hidden or visible but unfocused, the shortcut presents it in
-  the foreground; if it is already focused, the shortcut hides it. Invoking
-  `ptyxis --toggle-quake` directly retains the original
-  visible/hidden toggle behavior.
+- Existing Wayland portal bindings are restored silently; if none exists, the
+  daemon requests the binding and the desktop may show a permission dialog.
+  Preferences can change the binding through the portal or start and stop the
+  daemon for the current login.
+- Wayland portal activations use the compositor-provided activation token. If
+  the Quake window is hidden or visible but unfocused, the shortcut presents
+  it in the foreground; if it is already focused, the shortcut hides it.
+  Invoking `ptyxis --toggle-quake` directly retains the original visible/hidden
+  toggle behavior.
+- If the Wayland desktop does not provide the Global Shortcuts portal, Ptyxis
+  does not run the daemon. It displays a notice and asks the user to configure
+  a desktop shortcut which runs `ptyxis --toggle-quake`; Preferences displays
+  the same manual setup instruction. With this fallback, an active Quake window
+  is hidden and a hidden or inactive window is presented, subject to the
+  compositor's activation policy.
+- On X11, the daemon is not used. Configure a custom keyboard shortcut in the
+  desktop settings which runs `ptyxis --toggle-quake`; Preferences displays
+  the same instruction instead of daemon controls. One invocation presents a
+  hidden, minimized, or visible-but-unfocused Quake window, while an invocation
+  with the Quake window focused hides it. Foreground activation remains subject
+  to the X11 window manager's focus-stealing policy.
 
 Window placement and animation remain the compositor's responsibility. In
 particular, the Wayland protocol does not let a normal application reliably

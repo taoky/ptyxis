@@ -113,21 +113,28 @@ pane 时会撤回通知。
   会复用该窗口，而不是创建普通窗口。
 - Quake 窗口不会参与普通的最近使用窗口选择、常规尺寸决策或会话持久化。
 - 标题栏和样式会明确标识它是 Quake 终端，以便与普通 Ptyxis 窗口区分。
-- 一个很小的 `ptyxis-quake-daemon` 进程负责持有 Global Shortcuts portal 会话，
-  首选按键为 `Ctrl+grave`（Ctrl 加反引号键）。它只会在首次使用 Quake 模式或在
-  首选项中明确启用后启动，并不包含终端或窗口实现。
-- 首次使用时，Ptyxis 会询问是否在登录时启动快捷键服务。Flatpak 构建通过
-  Background portal 注册，原生构建则使用当前用户的 XDG autostart 项。选择不
-  自启动时，快捷键在当前登录会话中仍然可用；之后可在首选项的“行为”页面修改。
-- 已有的 portal 绑定会静默恢复；若尚无绑定，daemon 会请求创建绑定，此时桌面
-  环境可能显示许可对话框。
-- 首选项提供“更改快捷键…”按钮，通过 Global Shortcuts portal v2 打开由桌面环境
-  管理的可信快捷键配置界面。
-  同一区域也可以启动或停止当前登录会话中的 daemon；daemon 停止时，依赖它的
-  控件会被禁用。此操作不会改变独立的登录时自启动选项。
-- 从 portal 激活快捷键时会使用合成器提供的 activation token。Quake 窗口隐藏或
-  可见但未聚焦时，快捷键会将它带到前台；窗口已聚焦时则会隐藏它。不带
+- 在 Wayland 下，一个很小的 `ptyxis-quake-daemon` 进程负责持有 Global Shortcuts
+  portal 会话，首选按键为 `Ctrl+grave`（Ctrl 加反引号键）。它只会在首次使用
+  Quake 模式或在首选项中明确启用后启动，并不包含终端或窗口实现。
+- 在 Wayland 下首次使用时，Ptyxis 会询问是否在登录时启动快捷键服务。Flatpak
+  构建通过 Background portal 注册，原生构建则使用当前用户的 XDG autostart 项。
+  选择不自启动时，快捷键在当前登录会话中仍然可用；之后可在首选项的“行为”页面
+  修改。
+- Wayland 下已有的 portal 绑定会静默恢复；若尚无绑定，daemon 会请求创建绑定，
+  此时桌面环境可能显示许可对话框。首选项可以通过 portal 更改绑定，也可以启动或
+  停止当前登录会话中的 daemon。
+- 从 Wayland portal 激活快捷键时会使用合成器提供的 activation token。Quake
+  窗口隐藏或可见但未聚焦时，快捷键会将它带到前台；窗口已聚焦时则会隐藏它。
   直接执行 `ptyxis --toggle-quake` 时，仍保持原有的显示／隐藏切换行为。
+- 如果 Wayland 桌面环境不提供 Global Shortcuts portal，Ptyxis 不会运行 daemon，
+  而是显示提示，请用户在桌面环境中配置一个运行 `ptyxis --toggle-quake` 的快捷键；
+  首选项也会显示相同的手动设置说明。在此回退模式下，Quake 窗口已聚焦时会被隐藏，
+  隐藏或未聚焦时则会尝试显示到前台，最终是否允许激活仍由合成器决定。
+- 在 X11 下不使用 daemon。请在桌面环境的键盘快捷键设置中创建一个运行
+  `ptyxis --toggle-quake` 的自定义快捷键；首选项会显示同样的说明，而不显示 daemon
+  控件。执行一次命令会显示隐藏或最小化的 Quake 窗口，也会将可见但未聚焦的窗口
+  带到前台；Quake 窗口已聚焦时则会将它隐藏。窗口能否获得前台焦点仍由 X11 窗口
+  管理器的防焦点窃取策略决定。
 
 窗口位置和动画仍由合成器负责。尤其是 Wayland 协议不允许普通应用可靠地指定屏幕
 边缘的绝对位置，因此无法保证它在所有桌面上都能像合成器原生的下拉终端一样工作。
