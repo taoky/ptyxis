@@ -31,7 +31,8 @@ profiles, searchable tabs, and split terminal panes.
 %autosetup -p1
 
 %build
-%meson --buildtype=plain --wrap-mode=nodownload
+%meson --buildtype=plain --wrap-mode=nodownload \
+       -Dpackage-version=%{version}-%{release}
 %meson_build
 
 %install

@@ -17,7 +17,8 @@ sha256sums=('@SOURCE_SHA256@')
 build() {
   arch-meson "ptyxis-${pkgver}" build \
     --buildtype=plain \
-    --wrap-mode=nodownload
+    --wrap-mode=nodownload \
+    -Dpackage-version="${pkgver}-${pkgrel}"
   meson compile -C build
 }
 

@@ -1,4 +1,5 @@
 option('development', type: 'boolean', value: false, description: 'If this is a development build')
+option('package-version', type: 'string', value: '', description: 'The version of the built package')
 option('generic', type: 'combo', value: 'ptyxis',
        choices: ['ptyxis', 'terminal', 'builder'],
        description: 'How the application should be named')

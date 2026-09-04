@@ -178,6 +178,10 @@ build_flatpak() {
     state_args+=(--state-dir="$flatpak_builder_state_dir")
   fi
 
+  sed -i \
+    "/\"name\": \"ptyxis\"/,/\"sources\":/ s|\"--buildtype=release\",|\"--buildtype=release\",\n        \"-Dpackage-version=${flatpak_version}\",|" \
+    "$work_dir/source/packaging/flatpak/org.gnome.Ptyxis.json"
+
   flatpak run org.flatpak.Builder \
     --user \
     --force-clean \

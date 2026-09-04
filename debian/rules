@@ -4,4 +4,5 @@
 	dh $@ --buildsystem=meson
 
 override_dh_auto_configure:
-	dh_auto_configure -- --buildtype=plain --wrap-mode=nodownload
+	dh_auto_configure -- --buildtype=plain --wrap-mode=nodownload \
+		-Dpackage-version=$$(dpkg-parsechangelog -SVersion)

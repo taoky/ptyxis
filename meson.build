@@ -15,6 +15,11 @@ app_schema_path = get_option('gschema-path')
 app_is_generic = get_option('generic') != 'ptyxis'
 app_is_builder = get_option('generic') == 'builder'
 app_id = get_option('app-id')
+package_version = get_option('package-version')
+
+if package_version == ''
+  package_version = meson.project_version()
+endif
 
 if get_option('development')
   if app_id == ''
@@ -79,7 +84,7 @@ config_h.set_quoted('APP_SCHEMA_PATH', app_schema_path)
 config_h.set_quoted('APP_SCHEMA_PROFILE_ID', app_schema_profile_id)
 config_h.set_quoted('APP_SCHEMA_SHORTCUTS_ID', app_schema_shortcuts_id)
 config_h.set_quoted('APP_SCHEMA_SHORTCUTS_PATH', app_schema_shortcuts_path)
-config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
+config_h.set_quoted('PACKAGE_VERSION', package_version)
 config_h.set_quoted('GETTEXT_PACKAGE', 'ptyxis')
 config_h.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
 config_h.set_quoted('BINDIR', get_option('prefix') / get_option('bindir'))
