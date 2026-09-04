@@ -20,6 +20,8 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
     test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -f debian/ptyxis/usr/share/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
+    grep -Fq -- "update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis 40" debian/ptyxis/DEBIAN/postinst && \
+    grep -Fq -- "update-alternatives --remove x-terminal-emulator /usr/bin/ptyxis" debian/ptyxis/DEBIAN/prerm && \
     test -f /ptyxis-dbgsym_*.deb && \
     mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.deb /out/
 
@@ -46,6 +48,8 @@ RUN DEBFULLNAME="Ptyxis snapshot builder" \
     test -x debian/ptyxis/usr/bin/ptyxis-quake-daemon && \
     test -f debian/ptyxis/usr/share/dbus-1/services/org.gnome.Ptyxis.QuakeDaemon.service && \
     test -x debian/ptyxis/usr/libexec/ptyxis-agent && \
+    grep -Fq -- "update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis 40" debian/ptyxis/DEBIAN/postinst && \
+    grep -Fq -- "update-alternatives --remove x-terminal-emulator /usr/bin/ptyxis" debian/ptyxis/DEBIAN/prerm && \
     test -f /ptyxis-dbgsym_*.ddeb && \
     mkdir -p /out && cp /ptyxis_*.deb /ptyxis-dbgsym_*.ddeb /out/
 

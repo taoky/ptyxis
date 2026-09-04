@@ -125,6 +125,9 @@ sudo apt install ./dist/debian/gitYYYYMMDD.SHA/ptyxis_*.deb
 
 Use `dist/ubuntu/` instead for an Ubuntu build.
 Install the matching `ptyxis-dbgsym_*.deb` when collecting a backtrace.
+The Debian and Ubuntu packages register `/usr/bin/ptyxis` as an
+`x-terminal-emulator` alternative with priority 40. To select it explicitly,
+run `sudo update-alternatives --config x-terminal-emulator`.
 
 Fedora:
 
