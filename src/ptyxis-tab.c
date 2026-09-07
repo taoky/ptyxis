@@ -266,6 +266,8 @@ ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
 
   ptyxis_tab_set_active_pane (self, pane);
   ptyxis_tab_set_needs_attention (self, FALSE);
+  g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
+                                       ptyxis_tab_get_uuid (self));
   notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
   g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                        notification_id);
@@ -1250,7 +1252,7 @@ ptyxis_tab_notify_contains_focus_cb (PtyxisTab               *self,
     {
       ptyxis_tab_set_needs_attention (self, FALSE);
       g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                           ptyxis_pane_get_uuid (self->active_pane));
+                                           ptyxis_tab_get_uuid (self));
     }
 }
 
