@@ -78,7 +78,8 @@ ptyxis_close_dialog_response (AdwAlertDialog *dialog,
 
   if (!g_strcmp0 (response, "discard"))
     {
-      ptyxis_close_dialog_confirm (dialog, requests, TRUE);
+      if (!g_object_get_data (G_OBJECT (dialog), "confirm-only"))
+        ptyxis_close_dialog_confirm (dialog, requests, TRUE);
       g_task_return_boolean (task, TRUE);
     }
   else
@@ -188,9 +189,10 @@ _ptyxis_close_dialog_new (GtkWindow *parent,
   return dialog;
 }
 
-void
-_ptyxis_close_dialog_run_async (GtkWindow           *parent,
+static void
+ptyxis_close_dialog_run_async (GtkWindow           *parent,
                                 GPtrArray           *tabs,
+                                gboolean             confirm_only,
                                 GCancellable        *cancellable,
                                 GAsyncReadyCallback  callback,
                                 gpointer             user_data)
@@ -202,6 +204,7 @@ _ptyxis_close_dialog_run_async (GtkWindow           *parent,
   g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
 
   dialog = _ptyxis_close_dialog_new (parent, tabs, NULL);
+  g_object_set_data (G_OBJECT (dialog), "confirm-only", GINT_TO_POINTER (confirm_only));
   task = g_task_new (dialog, cancellable, callback, user_data);
   g_task_set_source_tag (task, _ptyxis_close_dialog_run_async);
 
@@ -216,6 +219,27 @@ _ptyxis_close_dialog_run_async (GtkWindow           *parent,
                           g_steal_pointer (&task),
                           g_object_unref);
   adw_dialog_present (dialog, GTK_WIDGET (parent));
+}
+
+void
+_ptyxis_close_dialog_run_async (GtkWindow *parent,
+                                GPtrArray *tabs,
+                                GCancellable *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+  ptyxis_close_dialog_run_async (parent, tabs, FALSE, cancellable, callback, user_data);
+}
+
+/* Quake shutdown must stop its service before terminating the terminals. */
+void
+_ptyxis_close_dialog_confirm_async (GtkWindow *parent,
+                                    GPtrArray *tabs,
+                                    GCancellable *cancellable,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
+{
+  ptyxis_close_dialog_run_async (parent, tabs, TRUE, cancellable, callback, user_data);
 }
 
 void

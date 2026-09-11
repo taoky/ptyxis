@@ -92,4 +92,7 @@ PtyxisIpcContainer *ptyxis_application_find_container_by_name     (PtyxisApplica
                                                                    const char           *name);
 void                ptyxis_application_save_session               (PtyxisApplication    *self);
 
+void ptyxis_application_set_quake_quitting (PtyxisApplication *self,
+                                             gboolean quitting);
+
 G_END_DECLS

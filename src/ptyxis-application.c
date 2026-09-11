@@ -72,6 +72,9 @@ struct _PtyxisApplication
   guint                fullscreen : 1;
   guint                quake_prompt_active : 1;
   QuakeSupport         quake_support;
+  guint                quake_support_generation;
+  GCancellable        *quake_cancellable;
+  guint                quake_quitting : 1;
 };
 
 static void ptyxis_application_about             (GSimpleAction *action,
@@ -427,8 +430,20 @@ ptyxis_application_toggle_quake (PtyxisApplication *self,
 {
   g_assert (PTYXIS_IS_APPLICATION (self));
 
+  if (self->quake_quitting)
+    return;
+
+  if (g_cancellable_is_cancelled (self->quake_cancellable))
+    {
+      g_clear_object (&self->quake_cancellable);
+      self->quake_cancellable = g_cancellable_new ();
+    }
+
+
   if (self->quake_window == NULL)
     {
+      g_settings_set_boolean (ptyxis_settings_get_settings (self->settings),
+                              PTYXIS_QUAKE_USED_KEY, TRUE);
       self->quake_window = ptyxis_window_new ();
       ptyxis_window_set_quake_mode (self->quake_window, TRUE);
       g_object_add_weak_pointer (G_OBJECT (self->quake_window),
@@ -467,14 +482,53 @@ ptyxis_application_toggle_quake_action (GSimpleAction *action,
 typedef struct
 {
   PtyxisApplication *application;
+  GCancellable      *cancellable;
   gboolean           autostart;
-} QuakeProvision;
+  guint              service_generation;
+} QuakeRequest;
+
+static QuakeRequest *
+quake_request_new (PtyxisApplication *self)
+{
+  QuakeRequest *request = g_new0 (QuakeRequest, 1);
+
+  request->service_generation = ptyxis_quake_service_get_generation ();
+  request->application = g_object_ref (self);
+  request->cancellable = g_object_ref (self->quake_cancellable);
+  return request;
+}
 
 static void
-quake_provision_free (QuakeProvision *provision)
+quake_request_free (QuakeRequest *request)
 {
-  g_clear_object (&provision->application);
-  g_free (provision);
+  g_clear_object (&request->application);
+  g_clear_object (&request->cancellable);
+  g_free (request);
+}
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (QuakeRequest, quake_request_free)
+
+static gboolean
+quake_request_cancelled (QuakeRequest *request)
+{
+  return g_cancellable_is_cancelled (request->cancellable) ||
+         request->service_generation != ptyxis_quake_service_get_generation ();
+}
+
+void
+ptyxis_application_set_quake_quitting (PtyxisApplication *self,
+                                        gboolean           quitting)
+{
+  g_return_if_fail (PTYXIS_IS_APPLICATION (self));
+
+  self->quake_quitting = quitting;
+  if (quitting)
+    {
+      g_cancellable_cancel (self->quake_cancellable);
+      self->quake_prompt_active = FALSE;
+      if (self->quake_support == QUAKE_SUPPORT_CHECKING)
+        self->quake_support = QUAKE_SUPPORT_UNKNOWN;
+    }
 }
 
 static void
@@ -522,17 +576,42 @@ ptyxis_application_show_manual_quake_shortcut (PtyxisApplication *self)
 }
 
 static void
+ptyxis_application_quake_started_cb (GObject      *object,
+                                     GAsyncResult *result,
+                                     gpointer      user_data)
+{
+  g_autoptr(QuakeRequest) request = user_data;
+  g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_ensure_running_finish (result, &error) &&
+      !quake_request_cancelled (request))
+    ptyxis_application_show_quake_service_error (request->application, error);
+}
+
+static void
+ptyxis_application_start_quake_service (PtyxisApplication *self)
+{
+  if (!self->quake_quitting && !g_cancellable_is_cancelled (self->quake_cancellable))
+    ptyxis_quake_service_ensure_running_async (self->quake_cancellable,
+                                               ptyxis_application_quake_started_cb,
+                                               quake_request_new (self));
+}
+
+static void
 ptyxis_application_quake_background_fallback_cb (GObject      *object,
                                                   GAsyncResult *result,
                                                   gpointer      user_data)
 {
-  g_autoptr(PtyxisApplication) self = user_data;
+  g_autoptr(QuakeRequest) request = user_data;
   g_autoptr(GError) error = NULL;
+  gboolean success = ptyxis_quake_service_set_autostart_finish (result, &error);
 
-  if (ptyxis_quake_service_set_autostart_finish (result, &error))
-    ptyxis_quake_service_start ();
+  if (quake_request_cancelled (request))
+    return;
+  if (success)
+    ptyxis_application_start_quake_service (request->application);
   else
-    ptyxis_application_show_quake_service_error (self, error);
+    ptyxis_application_show_quake_service_error (request->application, error);
 }
 
 static void
@@ -540,35 +619,32 @@ ptyxis_application_quake_provision_cb (GObject      *object,
                                        GAsyncResult *result,
                                        gpointer      user_data)
 {
-  QuakeProvision *provision = user_data;
-  PtyxisApplication *self = provision->application;
+  g_autoptr(QuakeRequest) request = user_data;
+  PtyxisApplication *self = request->application;
   GSettings *settings = ptyxis_settings_get_settings (self->settings);
   g_autoptr(GError) error = NULL;
+  gboolean success = ptyxis_quake_service_set_autostart_finish (result, &error);
 
-  if (ptyxis_quake_service_set_autostart_finish (result, &error))
+  if (quake_request_cancelled (request))
+    return;
+
+  if (success)
     {
-      g_settings_set_boolean (settings,
-                              PTYXIS_QUAKE_AUTOSTART_KEY,
-                              provision->autostart);
-      ptyxis_quake_service_start ();
+      g_settings_set_boolean (settings, PTYXIS_QUAKE_AUTOSTART_KEY, request->autostart);
+      ptyxis_application_start_quake_service (self);
     }
-  else if (provision->autostart)
+  else if (request->autostart)
     {
       ptyxis_application_show_quake_service_error (self, error);
-
-      /* Autostart can be rejected independently. Still ask for background
-       * access so the shortcut can remain available for this login. */
+      /* Login autostart and background access can be granted independently. */
       ptyxis_quake_service_set_autostart_async (
         self->quake_window != NULL ? GTK_WINDOW (self->quake_window) : NULL,
-        FALSE,
-        NULL,
+        FALSE, request->cancellable,
         ptyxis_application_quake_background_fallback_cb,
-        g_object_ref (self));
+        quake_request_new (self));
     }
   else
     ptyxis_application_show_quake_service_error (self, error);
-
-  quake_provision_free (provision);
 }
 
 static void
@@ -576,29 +652,22 @@ ptyxis_application_quake_prompt_cb (GObject      *object,
                                     GAsyncResult *result,
                                     gpointer      user_data)
 {
-  g_autoptr(PtyxisApplication) self = user_data;
-  const char *response;
-  GSettings *settings;
-  QuakeProvision *provision;
-  gboolean autostart;
+  g_autoptr(QuakeRequest) request = user_data;
+  PtyxisApplication *self = request->application;
+  const char *response = adw_alert_dialog_choose_finish (ADW_ALERT_DIALOG (object), result);
+  GCancellable *cancellable = request->cancellable;
+  gboolean autostart = g_strcmp0 (response, "autostart") == 0;
 
-  response = adw_alert_dialog_choose_finish (ADW_ALERT_DIALOG (object), result);
-  self->quake_prompt_active = FALSE;
-  autostart = g_strcmp0 (response, "autostart") == 0;
-  settings = ptyxis_settings_get_settings (self->settings);
-
-  g_settings_set_boolean (settings, PTYXIS_QUAKE_PROMPTED_KEY, TRUE);
-
-  provision = g_new0 (QuakeProvision, 1);
-  provision->application = g_object_ref (self);
-  provision->autostart = autostart;
-
+  if (request->cancellable == self->quake_cancellable)
+    self->quake_prompt_active = FALSE;
+  if (quake_request_cancelled (request))
+    return;
+  g_settings_set_boolean (ptyxis_settings_get_settings (self->settings), PTYXIS_QUAKE_PROMPTED_KEY, TRUE);
+  request->autostart = autostart;
   ptyxis_quake_service_set_autostart_async (
     self->quake_window != NULL ? GTK_WINDOW (self->quake_window) : NULL,
-    autostart,
-    NULL,
-    ptyxis_application_quake_provision_cb,
-    provision);
+    autostart, cancellable, ptyxis_application_quake_provision_cb,
+    g_steal_pointer (&request));
 }
 
 static void
@@ -609,13 +678,14 @@ ptyxis_application_ensure_quake_service (PtyxisApplication *self)
 
   g_assert (PTYXIS_IS_APPLICATION (self));
 
-  if (!ptyxis_quake_service_is_available ())
+  if (self->quake_quitting || g_cancellable_is_cancelled (self->quake_cancellable) ||
+      !ptyxis_quake_service_is_available ())
     return;
 
   settings = ptyxis_settings_get_settings (self->settings);
   if (g_settings_get_boolean (settings, PTYXIS_QUAKE_PROMPTED_KEY))
     {
-      ptyxis_quake_service_start ();
+      ptyxis_application_start_quake_service (self);
       return;
     }
 
@@ -638,9 +708,9 @@ ptyxis_application_ensure_quake_service (PtyxisApplication *self)
   adw_alert_dialog_set_close_response (dialog, "no-autostart");
   adw_alert_dialog_choose (dialog,
                            GTK_WIDGET (self->quake_window),
-                           NULL,
+                           self->quake_cancellable,
                            ptyxis_application_quake_prompt_cb,
-                           g_object_ref (self));
+                           quake_request_new (self));
 }
 
 static void
@@ -648,17 +718,15 @@ ptyxis_application_check_quake_support_cb (GObject      *object,
                                             GAsyncResult *result,
                                             gpointer      user_data)
 {
-  g_autoptr(PtyxisApplication) self = user_data;
+  g_autoptr(QuakeRequest) request = user_data;
+  PtyxisApplication *self = request->application;
   g_autoptr(GError) error = NULL;
   gboolean supported;
 
   supported = ptyxis_quake_service_check_supported_finish (result, &error);
 
-  if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-    {
-      self->quake_support = QUAKE_SUPPORT_UNKNOWN;
-      return;
-    }
+  if (quake_request_cancelled (request))
+    return;
 
   if (supported)
     {
@@ -678,6 +746,13 @@ ptyxis_application_check_quake_support (PtyxisApplication *self)
 {
   g_assert (PTYXIS_IS_APPLICATION (self));
 
+  if (self->quake_quitting || g_cancellable_is_cancelled (self->quake_cancellable))
+    return;
+
+  if (self->quake_support == QUAKE_SUPPORT_CHECKING &&
+      self->quake_support_generation != ptyxis_quake_service_get_generation ())
+    self->quake_support = QUAKE_SUPPORT_UNKNOWN;
+
   if (self->quake_support == QUAKE_SUPPORT_SUPPORTED)
     {
       ptyxis_application_ensure_quake_service (self);
@@ -695,10 +770,45 @@ ptyxis_application_check_quake_support (PtyxisApplication *self)
     return;
 
   self->quake_support = QUAKE_SUPPORT_CHECKING;
+  self->quake_support_generation = ptyxis_quake_service_get_generation ();
   ptyxis_quake_service_check_supported_async (
-    NULL,
+    self->quake_cancellable,
     ptyxis_application_check_quake_support_cb,
-    g_object_ref (self));
+    quake_request_new (self));
+}
+
+static void
+ptyxis_application_quake_launch_started_cb (GObject      *object,
+                                            GAsyncResult *result,
+                                            gpointer      user_data)
+{
+  g_autoptr(QuakeRequest) request = user_data;
+  g_autoptr(GError) error = NULL;
+
+  if (!ptyxis_quake_service_ensure_running_finish (result, &error) &&
+      !quake_request_cancelled (request))
+    g_warning ("Failed to restore the Quake shortcut service: %s", error->message);
+}
+
+static void
+ptyxis_application_quake_launch_supported_cb (GObject      *object,
+                                              GAsyncResult *result,
+                                              gpointer      user_data)
+{
+  g_autoptr(QuakeRequest) request = user_data;
+  PtyxisApplication *self = request->application;
+  GCancellable *cancellable = request->cancellable;
+  g_autoptr(GError) error = NULL;
+  gboolean supported = ptyxis_quake_service_check_supported_finish (result, &error);
+
+  if (quake_request_cancelled (request) || !supported ||
+      !g_settings_get_boolean (ptyxis_settings_get_settings (self->settings),
+                               PTYXIS_QUAKE_START_ON_LAUNCH_KEY))
+    return;
+
+  ptyxis_quake_service_ensure_running_async (cancellable,
+                                             ptyxis_application_quake_launch_started_cb,
+                                             g_steal_pointer (&request));
 }
 
 static void
@@ -1403,6 +1513,12 @@ ptyxis_application_startup (GApplication *application)
   g_object_bind_property (self->settings, "interface-style",
                           style_manager, "color-scheme",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
+
+  if (ptyxis_quake_service_should_start_on_launch (ptyxis_settings_get_settings (self->settings)) &&
+      ptyxis_quake_service_is_available ())
+    ptyxis_quake_service_check_supported_async (self->quake_cancellable,
+                                                ptyxis_application_quake_launch_supported_cb,
+                                                quake_request_new (self));
 }
 
 static void
@@ -1413,6 +1529,7 @@ ptyxis_application_finalize (GObject *object)
   if (self->exited != NULL)
     g_hash_table_remove_all (self->exited);
 
+  g_clear_object (&self->quake_cancellable);
   g_clear_object (&self->xdg_terminals_list_monitor);
   g_clear_object (&self->profiles);
   g_clear_object (&self->portal);
@@ -1559,6 +1676,8 @@ ptyxis_application_init (PtyxisApplication *self)
 
     { NULL }
   };
+
+  self->quake_cancellable = g_cancellable_new ();
 
   g_string_append_c (summary, '\n');
   g_string_append_c (summary, '\n');

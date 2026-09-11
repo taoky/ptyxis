@@ -9,6 +9,8 @@
 
 G_BEGIN_DECLS
 
+#define PTYXIS_QUAKE_USED_KEY "quake-used"
+#define PTYXIS_QUAKE_START_ON_LAUNCH_KEY "quake-start-on-launch"
 #define PTYXIS_QUAKE_AUTOSTART_KEY "quake-autostart"
 #define PTYXIS_QUAKE_PROMPTED_KEY  "quake-autostart-prompted"
 #define PTYXIS_QUAKE_SHORTCUT_DESCRIPTION_KEY "quake-shortcut-description"
@@ -19,6 +21,13 @@ void     ptyxis_quake_service_check_supported_async(GCancellable         *cancel
                                                      gpointer              user_data);
 gboolean ptyxis_quake_service_check_supported_finish(GAsyncResult        *result,
                                                       GError             **error);
+guint    ptyxis_quake_service_get_generation (void);
+gboolean ptyxis_quake_service_should_start_on_launch (GSettings *settings);
+void     ptyxis_quake_service_ensure_running_async (GCancellable *cancellable,
+                                                     GAsyncReadyCallback callback,
+                                                     gpointer user_data);
+gboolean ptyxis_quake_service_ensure_running_finish (GAsyncResult *result,
+                                                      GError **error);
 void     ptyxis_quake_service_start                (void);
 void     ptyxis_quake_service_set_autostart_async  (GtkWindow            *parent,
                                                      gboolean              enabled,
@@ -39,6 +48,13 @@ gboolean ptyxis_quake_service_stop_finish           (GAsyncResult         *resul
                                                      GError              **error);
 
 /* Exposed for focused tests; callers should normally use the async API. */
+void _ptyxis_quake_service_set_running_async (const char *name,
+                                               const char *executable,
+                                               gboolean running,
+                                               guint timeout_msec,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
 gboolean _ptyxis_quake_service_set_native_autostart (const char           *template_path,
                                                       const char           *config_dir,
                                                       gboolean              enabled,

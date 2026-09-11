@@ -793,6 +793,13 @@
   <menu id="primary_menu">
     <section>
       <item>
+        <attribute name="label" translatable="yes">Quit Quake</attribute>
+        <attribute name="action">win.quit-quake</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="custom">interface-style</attribute>
       </item>
     </section>

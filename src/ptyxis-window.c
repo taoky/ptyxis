@@ -40,6 +40,7 @@
 #include "ptyxis-profile-dialog.h"
 #include "ptyxis-util.h"
 #include "ptyxis-window.h"
+#include "ptyxis-quake-service.h"
 #include "ptyxis-window-dressing.h"
 
 #ifdef GDK_WINDOWING_X11
@@ -92,6 +93,7 @@ struct _PtyxisWindow
   guint                  disposed : 1;
   guint                  single_terminal_mode : 1;
   guint                  quake_mode : 1;
+  guint                  quitting_quake : 1;
   guint                  is_maximized : 1;
   guint                  is_fullscreen : 1;
   guint                  in_close_request : 1;
@@ -1168,6 +1170,89 @@ ptyxis_window_unfullscreen_action (GtkWidget  *widget,
 }
 
 static void
+ptyxis_window_quit_quake_stopped_cb (GObject      *object,
+                                     GAsyncResult *result,
+                                     gpointer      user_data)
+{
+  g_autoptr(PtyxisWindow) self = user_data;
+  g_autoptr(GError) error = NULL;
+  gboolean stopped = ptyxis_quake_service_stop_finish (result, &error);
+
+  self->quitting_quake = FALSE;
+  ptyxis_application_set_quake_quitting (PTYXIS_APPLICATION_DEFAULT, FALSE);
+  gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.quit-quake", self->quake_mode);
+  if (stopped)
+    gtk_window_destroy (GTK_WINDOW (self));
+  else
+    {
+      AdwAlertDialog *dialog = ADW_ALERT_DIALOG (
+        adw_alert_dialog_new (_("Could Not Stop Quake"), error->message));
+      adw_alert_dialog_add_response (dialog, "close", _("Close"));
+      adw_alert_dialog_set_close_response (dialog, "close");
+      adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (self));
+    }
+}
+
+static void
+ptyxis_window_stop_quake (PtyxisWindow *self)
+{
+  ptyxis_application_set_quake_quitting (PTYXIS_APPLICATION_DEFAULT, TRUE);
+  ptyxis_quake_service_stop_async (NULL, ptyxis_window_quit_quake_stopped_cb,
+                                   g_object_ref (self));
+}
+
+static void
+ptyxis_window_quit_quake_confirmed_cb (GObject      *object,
+                                       GAsyncResult *result,
+                                       gpointer      user_data)
+{
+  g_autoptr(PtyxisWindow) self = user_data;
+
+  if (_ptyxis_close_dialog_run_finish (result, NULL))
+    ptyxis_window_stop_quake (self);
+  else
+    {
+      self->quitting_quake = FALSE;
+      gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.quit-quake", self->quake_mode);
+    }
+}
+
+static void
+ptyxis_window_quit_quake_action (GtkWidget  *widget,
+                                 const char *action_name,
+                                 GVariant   *param)
+{
+  PtyxisWindow *self = PTYXIS_WINDOW (widget);
+  PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+  g_autoptr(GPtrArray) tabs = g_ptr_array_new_with_free_func (g_object_unref);
+
+  if (!self->quake_mode || self->quitting_quake || self->in_close_request)
+    return;
+
+  self->quitting_quake = TRUE;
+  gtk_widget_action_set_enabled (widget, "win.quit-quake", FALSE);
+  if (ptyxis_settings_get_prompt_on_close (settings))
+    {
+      for (guint i = 0; i < adw_tab_view_get_n_pages (self->tab_view); i++)
+        {
+          AdwTabPage *page = adw_tab_view_get_nth_page (self->tab_view, i);
+          PtyxisTab *tab = PTYXIS_TAB (adw_tab_page_get_child (page));
+
+          if (ptyxis_tab_is_running (tab, NULL))
+            g_ptr_array_add (tabs, g_object_ref (tab));
+        }
+    }
+
+  /* Do not close idle tabs while confirmation for other tabs is pending. */
+  if (tabs->len > 0)
+    _ptyxis_close_dialog_confirm_async (GTK_WINDOW (self), tabs, NULL,
+                                    ptyxis_window_quit_quake_confirmed_cb,
+                                    g_object_ref (self));
+  else
+    ptyxis_window_stop_quake (self);
+}
+
+static void
 ptyxis_window_hide_quake_action (GtkWidget  *widget,
                                  const char *action_name,
                                  GVariant   *param)
@@ -1497,6 +1582,9 @@ ptyxis_window_close_request (GtkWindow *window)
   guint n_pages;
 
   g_assert (PTYXIS_IS_WINDOW (self));
+
+  if (self->quitting_quake)
+    return GDK_EVENT_STOP;
 
   ptyxis_window_save_size (self);
 
@@ -2278,6 +2366,7 @@ ptyxis_window_class_init (PtyxisWindowClass *klass)
   gtk_widget_class_install_action (widget_class, "win.new-terminal", "(ss)", ptyxis_window_new_terminal_action);
   gtk_widget_class_install_action (widget_class, "win.fullscreen", NULL, ptyxis_window_fullscreen_action);
   gtk_widget_class_install_action (widget_class, "win.unfullscreen", NULL, ptyxis_window_unfullscreen_action);
+  gtk_widget_class_install_action (widget_class, "win.quit-quake", NULL, ptyxis_window_quit_quake_action);
   gtk_widget_class_install_action (widget_class, "win.hide-quake", NULL, ptyxis_window_hide_quake_action);
   gtk_widget_class_install_action (widget_class, "win.toggle-fullscreen", NULL, ptyxis_window_toggle_fullscreen);
   gtk_widget_class_install_action (widget_class, "win.tab-overview", NULL, ptyxis_window_tab_overview_action);
@@ -2369,6 +2458,7 @@ ptyxis_window_init (PtyxisWindow *self)
   self->shortcuts = g_object_ref (ptyxis_application_get_shortcuts (PTYXIS_APPLICATION_DEFAULT));
 
   gtk_widget_init_template (GTK_WIDGET (self));
+  gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.quit-quake", FALSE);
 
   g_signal_connect_object (self->find_bar_revealer,
                            "notify::reveal-child",
@@ -2880,6 +2970,8 @@ ptyxis_window_set_quake_mode (PtyxisWindow *self,
     return;
 
   self->quake_mode = quake_mode;
+  gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.quit-quake",
+                                  quake_mode && !self->quitting_quake);
 
   if (quake_mode)
     gtk_widget_add_css_class (GTK_WIDGET (self), "quake");

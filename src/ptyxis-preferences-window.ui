@@ -419,6 +419,12 @@
               </object>
             </child>
             <child>
+              <object class="AdwSwitchRow" id="quake_start_on_launch">
+                <property name="title" translatable="yes">Start with Ptyxis</property>
+                <property name="subtitle" translatable="yes">After Quake has been used, start its shortcut service when Ptyxis starts</property>
+              </object>
+            </child>
+            <child>
               <object class="AdwSwitchRow" id="quake_autostart">
                 <property name="title" translatable="yes">Start Shortcut Service at Login</property>
                 <property name="subtitle" translatable="yes">Keep the global Quake shortcut available before Ptyxis is opened</property>

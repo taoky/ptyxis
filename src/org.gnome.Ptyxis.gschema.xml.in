@@ -190,6 +190,17 @@
       <description>Restore tabs from previous session when starting Ptyxis</description>
     </key>
 
+    <key name="quake-used" type="b">
+      <default>false</default>
+      <summary>Quake Has Been Used</summary>
+      <description>Whether a Quake window has been opened before</description>
+    </key>
+    <key name="quake-start-on-launch" type="b">
+      <default>true</default>
+      <summary>Start Quake Shortcut Service with Ptyxis</summary>
+      <description>After Quake has been used, start its shortcut service when Ptyxis starts if it is not already running</description>
+    </key>
+
     <key name="quake-autostart" type="b">
       <default>false</default>
       <summary>Start Quake Shortcut Service at Login</summary>

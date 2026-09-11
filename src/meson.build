@@ -80,7 +80,7 @@ schema_config.set('APP_SCHEMA_PATH', app_schema_path)
 schema_config.set('APP_SCHEMA_PROFILE_ID', app_schema_profile_id)
 schema_config.set('APP_SCHEMA_SHORTCUTS_ID', app_schema_shortcuts_id)
 schema_config.set('APP_SCHEMA_SHORTCUTS_PATH', app_schema_shortcuts_path)
-configure_file(
+ptyxis_schema = configure_file(
           input: 'org.gnome.Ptyxis.gschema.xml.in',
          output: '@0@.gschema.xml'.format(app_schema_id),
   configuration: schema_config,

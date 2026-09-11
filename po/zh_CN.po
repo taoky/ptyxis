@@ -2326,3 +2326,27 @@ msgstr "关闭标签页(_C)"
 
 #~ msgid "Search down to next result"
 #~ msgstr "移至下个搜索结果"
+
+msgid "Quit Quake"
+msgstr "退出 Quake"
+
+msgid "Could Not Stop Quake"
+msgstr "无法停止 Quake"
+
+msgid "Start with Ptyxis"
+msgstr "随 Ptyxis 启动"
+
+msgid "After Quake has been used, start its shortcut service when Ptyxis starts"
+msgstr "使用过 Quake 后，在启动 Ptyxis 时启动其快捷键服务"
+
+msgid "Quake Has Been Used"
+msgstr "已使用过 Quake"
+
+msgid "Whether a Quake window has been opened before"
+msgstr "是否曾打开过 Quake 窗口"
+
+msgid "Start Quake Shortcut Service with Ptyxis"
+msgstr "随 Ptyxis 启动 Quake 快捷键服务"
+
+msgid "After Quake has been used, start its shortcut service when Ptyxis starts if it is not already running"
+msgstr "使用过 Quake 后，在启动 Ptyxis 时启动尚未运行的 Quake 快捷键服务"

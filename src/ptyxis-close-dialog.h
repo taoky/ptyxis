@@ -28,6 +28,11 @@ G_BEGIN_DECLS
 typedef struct _PtyxisPane PtyxisPane;
 typedef struct _PtyxisTab PtyxisTab;
 
+void     _ptyxis_close_dialog_confirm_async (GtkWindow *parent,
+                                              GPtrArray *tabs,
+                                              GCancellable *cancellable,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
 void     _ptyxis_close_dialog_run_async  (GtkWindow            *parent,
                                           GPtrArray            *tabs,
                                           GCancellable         *cancellable,

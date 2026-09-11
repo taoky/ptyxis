@@ -84,6 +84,7 @@ struct _PtyxisPreferencesWindow
   GtkListBox           *profiles_list_box;
   AdwSwitchRow         *restore_session;
   AdwSwitchRow         *quake_autostart;
+  AdwSwitchRow         *quake_start_on_launch;
   GtkButton            *quake_change_shortcut;
   AdwActionRow         *quake_shortcut;
   AdwActionRow         *quake_service_status;
@@ -352,6 +353,7 @@ typedef struct
 {
   PtyxisPreferencesWindow *window;
   gboolean                 enabled;
+  guint                    service_generation;
 } QuakeAutostartRequest;
 
 static void
@@ -387,7 +389,8 @@ ptyxis_preferences_window_quake_autostart_cb (GObject      *object,
       g_settings_set_boolean (gsettings,
                               PTYXIS_QUAKE_AUTOSTART_KEY,
                               request->enabled);
-      if (request->enabled)
+      if (request->enabled &&
+          request->service_generation == ptyxis_quake_service_get_generation ())
         ptyxis_quake_service_start ();
     }
   else
@@ -428,6 +431,7 @@ ptyxis_preferences_window_quake_autostart_changed_cb (AdwSwitchRow           *ro
   request = g_new0 (QuakeAutostartRequest, 1);
   request->window = g_object_ref (self);
   request->enabled = enabled;
+  request->service_generation = ptyxis_quake_service_get_generation ();
 
   g_clear_object (&self->quake_autostart_cancellable);
   self->quake_autostart_cancellable = g_cancellable_new ();
@@ -567,6 +571,7 @@ ptyxis_preferences_window_use_manual_quake_shortcut (PtyxisPreferencesWindow *se
 {
   gtk_widget_set_visible (GTK_WIDGET (self->quake_service_status), FALSE);
   gtk_widget_set_visible (GTK_WIDGET (self->quake_autostart), FALSE);
+  gtk_widget_set_visible (GTK_WIDGET (self->quake_start_on_launch), FALSE);
   gtk_widget_set_visible (GTK_WIDGET (self->quake_shortcut), FALSE);
   gtk_widget_set_visible (GTK_WIDGET (self->quake_manual_shortcut), TRUE);
 }
@@ -1175,6 +1180,8 @@ ptyxis_preferences_window_constructed (GObject *object)
 
   if (ptyxis_quake_service_is_available ())
     {
+      g_settings_bind (gsettings, PTYXIS_QUAKE_START_ON_LAUNCH_KEY,
+                       self->quake_start_on_launch, "active", G_SETTINGS_BIND_DEFAULT);
       self->updating_quake_autostart = TRUE;
       adw_switch_row_set_active (
         self->quake_autostart,
@@ -1522,6 +1529,7 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, preserve_directory);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, profiles_list_box);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_autostart);
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_start_on_launch);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_change_shortcut);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_shortcut);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, quake_service_status);

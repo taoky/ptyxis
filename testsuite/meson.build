@@ -58,6 +58,17 @@ terminal_copy_test = executable('test-terminal-copy',
 )
 test('test-terminal-copy', terminal_copy_test, env: test_env)
 
+mock_quake_daemon = executable('mock-quake-daemon', 'mock-quake-daemon.c',
+  dependencies: dependency('gio-2.0'),
+)
+quake_test_schemas = custom_target('quake-test-schemas',
+  output: 'gschemas.compiled',
+  depend_files: ptyxis_schema,
+  command: [find_program('glib-compile-schemas'), '--strict', '--targetdir', '@OUTDIR@',
+            join_paths(meson.project_build_root(), 'src')],
+  build_by_default: true,
+)
+
 quake_service_test = executable('test-quake-service',
   ['test-quake-service.c', '../src/ptyxis-quake-service.c'],
   c_args: testsuite_c_args,
@@ -65,6 +76,8 @@ quake_service_test = executable('test-quake-service',
   include_directories: [include_directories('..'), include_directories('../src')],
 )
 test('test-quake-service', quake_service_test,
-  args: [join_paths(meson.project_build_root(), 'data', '@0@.QuakeDaemon.desktop'.format(app_id))],
-  env: test_env,
+  args: [join_paths(meson.project_build_root(), 'data', '@0@.QuakeDaemon.desktop'.format(app_id)),
+         mock_quake_daemon.full_path()],
+  depends: [mock_quake_daemon, quake_test_schemas],
+  env: test_env + ['GSETTINGS_SCHEMA_DIR=' + meson.current_build_dir()],
 )

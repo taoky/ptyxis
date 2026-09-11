@@ -136,9 +136,16 @@ has not been comprehensively tested.
   distinguishable from a normal Ptyxis window.
 - On Wayland, a small `ptyxis-quake-daemon` process holds the Global Shortcuts
   portal session, with `Ctrl+grave` (Ctrl plus the grave-accent key) as its
-  preferred trigger. It starts only after Quake mode is first used or
-  explicitly enabled in Preferences, and contains no terminal or window
-  implementation.
+  preferred trigger. It contains no terminal or window implementation.
+- After Quake has been used, each new Ptyxis process starts the shortcut
+  service if it is not running, without opening a Quake window. Disable
+  **Start with Ptyxis** in Preferences to opt out. This is independent of
+  starting the service at login. Stopping it does not trigger an automatic
+  restart when opening another window in the same Ptyxis process.
+- **Quit Quake** in the Quake window’s main menu closes that window and stops
+  its shortcut service. Running commands use the usual close confirmation;
+  cancelling preserves all tabs. Other windows and both automatic startup
+  settings are unaffected. The hide button continues to keep terminals alive.
 - On first use under Wayland, Ptyxis asks whether the shortcut service should
   start at login. Flatpak builds use the Background portal; native builds use
   a per-user XDG autostart entry. Declining still keeps the shortcut available
