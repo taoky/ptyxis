@@ -56,7 +56,7 @@ struct _PtyxisTab
   PtyxisSplitNode         *split_root;
   GtkScrolledWindow       *scrolled_window;
   PtyxisTerminal          *terminal;
-  PtyxisTabNotify          notify;
+  GHashTable              *pane_notifications;
   char                    *uuid;
 
   guint                    ignore_snapshot : 1;
@@ -266,8 +266,7 @@ ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
 
   ptyxis_tab_set_active_pane (self, pane);
   ptyxis_tab_set_needs_attention (self, FALSE);
-  g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                       ptyxis_tab_get_uuid (self));
+  ptyxis_tab_notify_withdraw (pane);
   notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
   g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                        notification_id);
@@ -283,6 +282,8 @@ ptyxis_tab_connect_pane (PtyxisTab  *self,
 
   g_assert (PTYXIS_IS_TAB (self));
   g_assert (PTYXIS_IS_PANE (pane));
+
+  g_hash_table_insert (self->pane_notifications, pane, ptyxis_tab_notify_new (self, pane));
 
   terminal = ptyxis_pane_get_terminal (pane);
   settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
@@ -1104,6 +1105,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
 
   leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane));
   g_return_if_fail (leaf != NULL && ptyxis_split_node_get_parent (leaf) != NULL);
+  g_hash_table_remove (self->pane_notifications, pane);
   notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
   g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
                                        notification_id);
@@ -1251,8 +1253,7 @@ ptyxis_tab_notify_contains_focus_cb (PtyxisTab               *self,
   if (gtk_event_controller_focus_contains_focus (focus))
     {
       ptyxis_tab_set_needs_attention (self, FALSE);
-      g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
-                                           ptyxis_tab_get_uuid (self));
+      ptyxis_tab_notify_withdraw (self->active_pane);
     }
 }
 
@@ -1772,7 +1773,7 @@ ptyxis_tab_dispose (GObject *object)
 
   g_debug ("Disposing tab");
 
-  ptyxis_tab_notify_destroy (&self->notify);
+  g_clear_pointer (&self->pane_notifications, g_hash_table_unref);
 
   for (guint i = 0; i < ptyxis_tab_get_n_panes (self); i++)
     {
@@ -2128,10 +2129,10 @@ ptyxis_tab_init (PtyxisTab *self)
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
   self->active_pane = self->pane;
   self->uuid = g_strdup (ptyxis_pane_get_uuid (self->pane));
+  self->pane_notifications = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+                                                     NULL, (GDestroyNotify)ptyxis_tab_notify_free);
   ptyxis_tab_connect_pane (self, self->pane);
   ptyxis_tab_update_pane_accessibility (self);
-
-  ptyxis_tab_notify_init (&self->notify, self);
 
   controller = gtk_event_controller_scroll_new (GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
   gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);
@@ -2193,7 +2194,6 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
       self->banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
       self->terminal = ptyxis_pane_get_terminal (pane);
       self->scrolled_window = ptyxis_pane_get_scrolled_window (pane);
-      ptyxis_tab_notify_set_terminal (&self->notify, self->terminal);
       ptyxis_tab_update_scrollbar_policy (self);
       ptyxis_tab_update_padding_cb (self, NULL, settings);
       ptyxis_tab_update_word_char_exceptions (self, NULL, settings);

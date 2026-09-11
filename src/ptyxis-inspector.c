@@ -35,6 +35,7 @@ struct _PtyxisInspector
 {
   AdwPreferencesWindow       parent_instance;
 
+  GSignalGroup              *tab_signals;
   GSignalGroup              *terminal_signals;
   GBindingGroup             *terminal_bindings;
   GtkEventController        *motion;
@@ -311,15 +312,31 @@ ptyxis_inspector_motion_notify_cb (PtyxisInspector          *self,
 }
 
 static void
+ptyxis_inspector_active_pane_changed_cb (PtyxisInspector *self,
+                                         GParamSpec      *pspec,
+                                         PtyxisTab       *tab)
+{
+  g_autoptr(PtyxisTerminal) old_terminal = g_signal_group_dup_target (self->terminal_signals);
+  PtyxisTerminal *terminal = ptyxis_tab_get_terminal (tab);
+
+  if (old_terminal == terminal)
+    return;
+
+  if (old_terminal != NULL)
+    gtk_widget_remove_controller (GTK_WIDGET (old_terminal), self->motion);
+
+  gtk_widget_add_controller (GTK_WIDGET (terminal), g_object_ref (self->motion));
+  adw_action_row_set_subtitle (self->pointer, _("unset"));
+  g_binding_group_set_source (self->terminal_bindings, terminal);
+  g_signal_group_set_target (self->terminal_signals, terminal);
+}
+
+static void
 ptyxis_inspector_set_tab (PtyxisInspector *self,
                           PtyxisTab       *tab)
 {
-  PtyxisTerminal *terminal;
-
   g_assert (PTYXIS_IS_INSPECTOR (self));
   g_assert (PTYXIS_IS_TAB (tab));
-
-  terminal = ptyxis_tab_get_terminal (tab);
 
   self->motion = gtk_event_controller_motion_new ();
   g_signal_connect_object (self->motion,
@@ -337,10 +354,8 @@ ptyxis_inspector_set_tab (PtyxisInspector *self,
                            G_CALLBACK (ptyxis_inspector_motion_notify_cb),
                            self,
                            G_CONNECT_SWAPPED);
-  gtk_widget_add_controller (GTK_WIDGET (terminal), g_object_ref (self->motion));
-
-  g_binding_group_set_source (self->terminal_bindings, terminal);
-  g_signal_group_set_target (self->terminal_signals, terminal);
+  g_signal_group_set_target (self->tab_signals, tab);
+  ptyxis_inspector_active_pane_changed_cb (self, NULL, tab);
 }
 
 static gboolean
@@ -362,15 +377,9 @@ bind_with_empty (GBinding     *binding,
 PtyxisTab *
 ptyxis_inspector_dup_tab (PtyxisInspector *self)
 {
-  g_autoptr(PtyxisTerminal) terminal = NULL;
-  PtyxisTab *tab = NULL;
-
   g_return_val_if_fail (PTYXIS_IS_INSPECTOR (self), NULL);
 
-  if ((terminal = g_signal_group_dup_target (self->terminal_signals)))
-    tab = PTYXIS_TAB (gtk_widget_get_ancestor (GTK_WIDGET (terminal), PTYXIS_TYPE_TAB));
-
-  return tab ? g_object_ref (tab) : NULL;
+  return g_signal_group_dup_target (self->tab_signals);
 }
 
 static void
@@ -383,6 +392,8 @@ static void
 ptyxis_inspector_dispose (GObject *object)
 {
   PtyxisInspector *self = (PtyxisInspector *)object;
+
+  g_clear_object (&self->tab_signals);
 
   if (self->terminal_signals)
     {
@@ -494,6 +505,11 @@ ptyxis_inspector_class_init (PtyxisInspectorClass *klass)
 static void
 ptyxis_inspector_init (PtyxisInspector *self)
 {
+  self->tab_signals = g_signal_group_new (PTYXIS_TYPE_TAB);
+  g_signal_group_connect_object (self->tab_signals,
+                                 "notify::active-pane",
+                                 G_CALLBACK (ptyxis_inspector_active_pane_changed_cb),
+                                 self, G_CONNECT_SWAPPED);
   self->terminal_bindings = g_binding_group_new ();
   self->terminal_signals = g_signal_group_new (PTYXIS_TYPE_TERMINAL);
 
