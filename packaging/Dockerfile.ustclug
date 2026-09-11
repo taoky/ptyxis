@@ -60,7 +60,7 @@ FROM ustclug/fedora:44 AS fedora-build
 ARG BASE_VERSION
 ARG RPM_RELEASE
 RUN dnf install -y \
-    appstream desktop-file-utils gcc gettext git glib2-devel gtk4-devel \
+    appstream dbus-daemon desktop-file-utils gcc gettext git glib2-devel gtk4-devel \
     json-glib-devel libadwaita-devel libportal-gtk4-devel meson \
     ninja-build pkgconf-pkg-config rpm-build vte291-gtk4-devel && \
     dnf clean all

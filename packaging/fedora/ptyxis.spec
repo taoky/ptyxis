@@ -17,6 +17,7 @@ BuildRequires:  pkgconfig(libadwaita-1) >= 1.8
 BuildRequires:  pkgconfig(libportal-gtk4)
 BuildRequires:  pkgconfig(vte-2.91-gtk4) >= 0.79
 BuildRequires:  /usr/bin/appstreamcli
+BuildRequires:  /usr/bin/dbus-daemon
 BuildRequires:  /usr/bin/desktop-file-validate
 
 Suggests:       distrobox
