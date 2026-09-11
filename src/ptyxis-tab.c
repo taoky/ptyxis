@@ -3158,7 +3158,10 @@ ptyxis_tab_poll_agent_cb (GObject      *object,
         ptyxis_tab_set_needs_attention (self, TRUE);
 
       if (pane == self->active_pane)
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+        {
+          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
+        }
     }
 
   if (g_strcmp0 (ptyxis_pane_get_command_line (pane), the_cmdline) != 0)
@@ -3234,7 +3237,12 @@ ptyxis_tab_poll_pane_agent_async (PtyxisTab           *self,
       if (ptyxis_pane_get_process_leader_kind (pane) != PTYXIS_PROCESS_LEADER_KIND_UNKNOWN)
         {
           ptyxis_pane_set_process_leader_kind (pane, PTYXIS_PROCESS_LEADER_KIND_UNKNOWN);
-          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+
+          if (pane == self->active_pane)
+            {
+              g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROCESS_LEADER_KIND]);
+              g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_ICON]);
+            }
         }
 
       g_task_return_boolean (task, FALSE);
