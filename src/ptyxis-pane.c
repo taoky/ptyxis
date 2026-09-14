@@ -17,6 +17,7 @@ struct _PtyxisPane
   PtyxisTabMonitor *monitor;
   PtyxisTerminal *terminal;
   GtkWidget *banner;
+  GtkLabel *link_preview;
   GtkScrolledWindow *scrolled_window;
   GBindingGroup *terminal_bindings;
   PtyxisZoomLevel zoom;
@@ -92,6 +93,19 @@ ptyxis_pane_focus_changed_cb (PtyxisPane               *self,
 G_DEFINE_FINAL_TYPE (PtyxisPane, ptyxis_pane, GTK_TYPE_WIDGET)
 
 static void
+ptyxis_pane_hyperlink_hover_uri_changed_cb (PtyxisPane   *self,
+                                           const char   *uri,
+                                           GdkRectangle *bbox,
+                                           VteTerminal  *terminal)
+{
+  g_assert (PTYXIS_IS_PANE (self));
+  g_assert (VTE_IS_TERMINAL (terminal));
+
+  gtk_label_set_text (self->link_preview, uri != NULL ? uri : "");
+  gtk_widget_set_visible (GTK_WIDGET (self->link_preview), uri != NULL && uri[0] != '\0');
+}
+
+static void
 ptyxis_pane_dispose (GObject *object)
 {
   PtyxisPane *self = PTYXIS_PANE (object);
@@ -99,6 +113,7 @@ ptyxis_pane_dispose (GObject *object)
 
   self->terminal = NULL;
   self->banner = NULL;
+  self->link_preview = NULL;
   self->scrolled_window = NULL;
   g_clear_object (&self->profile);
   g_clear_object (&self->profile_signals);
@@ -292,6 +307,7 @@ ptyxis_pane_init (PtyxisPane *self)
 {
   GtkEventController *focus;
   GtkWidget *box;
+  GtkWidget *overlay;
 
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
@@ -317,8 +333,31 @@ ptyxis_pane_init (PtyxisPane *self)
                                  NULL);
   gtk_scrolled_window_set_child (self->scrolled_window, GTK_WIDGET (self->terminal));
   gtk_box_append (GTK_BOX (box), self->banner);
-  gtk_box_append (GTK_BOX (box), GTK_WIDGET (self->scrolled_window));
+  overlay = gtk_overlay_new ();
+
+  self->link_preview = g_object_new (GTK_TYPE_LABEL,
+                                     "visible", FALSE,
+                                     "can-target", FALSE,
+                                     "halign", GTK_ALIGN_START,
+                                     "valign", GTK_ALIGN_END,
+                                     "ellipsize", PANGO_ELLIPSIZE_END,
+                                     "max-width-chars", 80,
+                                     "single-line-mode", TRUE,
+                                     "xalign", 0.0f,
+                                     NULL);
+  gtk_widget_set_direction (GTK_WIDGET (self->link_preview), GTK_TEXT_DIR_LTR);
+  gtk_widget_add_css_class (GTK_WIDGET (self->link_preview), "link-preview");
+  gtk_overlay_set_child (GTK_OVERLAY (overlay), GTK_WIDGET (self->scrolled_window));
+  gtk_overlay_add_overlay (GTK_OVERLAY (overlay), GTK_WIDGET (self->link_preview));
+  gtk_overlay_set_clip_overlay (GTK_OVERLAY (overlay), GTK_WIDGET (self->link_preview), TRUE);
+  gtk_box_append (GTK_BOX (box), overlay);
   gtk_widget_set_parent (box, GTK_WIDGET (self));
+
+  g_signal_connect_object (self->terminal,
+                           "hyperlink-hover-uri-changed",
+                           G_CALLBACK (ptyxis_pane_hyperlink_hover_uri_changed_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
 
   g_binding_group_bind (self->terminal_bindings, "palette",
                         self->terminal, "palette", G_BINDING_SYNC_CREATE);

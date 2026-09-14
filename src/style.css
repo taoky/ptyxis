@@ -31,6 +31,15 @@ ptyxis-pane.search-target vte-terminal {
   box-shadow: inset 0 0 0 2px var(--accent-bg-color);
 }
 
+ptyxis-pane label.link-preview {
+  padding: 3px 8px;
+  margin: 4px;
+  border-radius: 6px;
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+  box-shadow: 0 1px 3px alpha(black, .2);
+}
+
 window.maximized vte-terminal:drop(active),
 window.tiled-bottom vte-terminal:drop(active) { border-radius: 0; }
 
