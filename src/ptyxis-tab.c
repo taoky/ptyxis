@@ -273,6 +273,13 @@ ptyxis_tab_pane_focus_entered_cb (PtyxisTab  *self,
 }
 
 static void
+ptyxis_pane_update_profile_signals (PtyxisPane *pane)
+{
+  g_signal_group_set_target (ptyxis_pane_get_profile_signals (pane),
+                             ptyxis_pane_get_profile (pane));
+}
+
+static void
 ptyxis_tab_connect_pane (PtyxisTab  *self,
                          PtyxisPane *pane)
 {
@@ -372,6 +379,16 @@ ptyxis_tab_connect_pane (PtyxisTab  *self,
                                  G_CALLBACK (ptyxis_pane_update_custom_links),
                                  pane,
                                  G_CONNECT_SWAPPED);
+
+  /* Install all handlers before binding, including for panes that already
+   * inherited a profile when they were created for a split.
+   */
+  g_signal_connect_object (pane,
+                           "notify::profile",
+                           G_CALLBACK (ptyxis_pane_update_profile_signals),
+                           pane,
+                           G_CONNECT_SWAPPED);
+  ptyxis_pane_update_profile_signals (pane);
 }
 
 G_DEFINE_FINAL_TYPE (PtyxisTab, ptyxis_tab, GTK_TYPE_WIDGET)
@@ -2421,7 +2438,6 @@ ptyxis_tab_restore_node (PtyxisTab             *self,
       if (profile != NULL)
         {
           ptyxis_pane_set_profile (pane, profile);
-          g_signal_group_set_target (ptyxis_pane_get_profile_signals (pane), profile);
         }
 
       if (!ptyxis_str_empty0 (container_id))
@@ -2547,7 +2563,6 @@ ptyxis_tab_apply_profile (PtyxisTab     *self,
 
   /* Replace the profile with the selected one. */
   ptyxis_pane_set_profile (self->active_pane, new_profile);
-  g_signal_group_set_target (ptyxis_pane_get_profile_signals (self->active_pane), new_profile);
 
   /* Notify that the profile property changed */
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PROFILE]);
