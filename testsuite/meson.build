@@ -42,6 +42,14 @@ split_node_test = executable('test-split-node',
 )
 test('test-split-node', split_node_test, env: test_env)
 
+split_layout_test = executable('test-split-layout',
+  ['test-split-layout.c', '../src/ptyxis-split-layout.c', '../src/ptyxis-split-node.c'],
+  c_args: testsuite_c_args,
+  dependencies: [dependency('gtk4'), cc.find_library('m', required: false)],
+  include_directories: [include_directories('..'), include_directories('../src')],
+)
+test('test-split-layout', split_layout_test, env: test_env)
+
 terminal_picker_test = executable('test-terminal-picker',
   ['test-terminal-picker.c', '../src/ptyxis-terminal-picker-match.c'],
   c_args: testsuite_c_args,

@@ -31,6 +31,7 @@ ptyxis_sources = [
   'ptyxis-shortcut-row.c',
   'ptyxis-shortcuts.c',
   'ptyxis-shrinker.c',
+  'ptyxis-split-layout.c',
   'ptyxis-split-node.c',
   'ptyxis-tab.c',
   'ptyxis-tab-monitor.c',

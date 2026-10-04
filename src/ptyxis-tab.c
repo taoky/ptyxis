@@ -37,6 +37,7 @@
 #include "ptyxis-enums.h"
 #include "ptyxis-inspector.h"
 #include "ptyxis-pane.h"
+#include "ptyxis-split-layout.h"
 #include "ptyxis-split-node.h"
 #include "ptyxis-tab-monitor.h"
 #include "ptyxis-tab-notify.h"
@@ -968,54 +969,6 @@ ptyxis_tab_respawn_action (GtkWidget  *widget,
     ptyxis_tab_respawn (self);
 }
 
-static void
-ptyxis_tab_split_position_changed_cb (GtkPaned        *paned,
-                                      GParamSpec      *pspec,
-                                      PtyxisSplitNode *node)
-{
-  GtkOrientation orientation;
-  int extent;
-  int position;
-
-  g_assert (GTK_IS_PANED (paned));
-  g_assert (node != NULL);
-
-  orientation = gtk_orientable_get_orientation (GTK_ORIENTABLE (paned));
-  extent = orientation == GTK_ORIENTATION_HORIZONTAL
-         ? gtk_widget_get_width (GTK_WIDGET (paned))
-         : gtk_widget_get_height (GTK_WIDGET (paned));
-  position = gtk_paned_get_position (paned);
-
-  if (extent > 1)
-    ptyxis_split_node_set_ratio (node, (double)position / extent);
-}
-
-static gboolean
-ptyxis_tab_apply_split_ratio_cb (GtkWidget     *widget,
-                                 GdkFrameClock *frame_clock,
-                                 gpointer       user_data)
-{
-  PtyxisSplitNode *node = user_data;
-  GtkOrientation orientation;
-  int extent;
-
-  orientation = gtk_orientable_get_orientation (GTK_ORIENTABLE (widget));
-  extent = orientation == GTK_ORIENTATION_HORIZONTAL
-         ? gtk_widget_get_width (widget)
-         : gtk_widget_get_height (widget);
-
-  if (extent <= 1)
-    return G_SOURCE_CONTINUE;
-
-  gtk_paned_set_position (GTK_PANED (widget),
-                          round (extent * ptyxis_split_node_get_ratio (node)));
-  g_signal_connect (widget,
-                    "notify::position",
-                    G_CALLBACK (ptyxis_tab_split_position_changed_cb),
-                    node);
-  return G_SOURCE_REMOVE;
-}
-
 static PtyxisPane *
 ptyxis_tab_split_pane (PtyxisTab            *self,
                        PtyxisPane           *source,
@@ -1066,7 +1019,7 @@ ptyxis_tab_split_pane (PtyxisTab            *self,
   g_object_unref (source);
 
   ptyxis_split_node_split (leaf, direction, ratio, G_OBJECT (new_pane));
-  gtk_widget_add_tick_callback (paned, ptyxis_tab_apply_split_ratio_cb, leaf, NULL);
+  ptyxis_split_layout_bind (GTK_PANED (paned), leaf);
   ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_update_pane_accessibility (self);
   ptyxis_tab_invalidate_search_text (self);
@@ -1114,6 +1067,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
 {
   g_autofree char *notification_id = NULL;
   PtyxisSplitNode *leaf;
+  PtyxisSplitNode *parent;
   PtyxisSplitNode *next;
   GtkPaned *paned;
   GtkWidget *grandparent;
@@ -1122,6 +1076,7 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
 
   leaf = ptyxis_split_node_find_pane (self->split_root, G_OBJECT (pane));
   g_return_if_fail (leaf != NULL && ptyxis_split_node_get_parent (leaf) != NULL);
+  parent = ptyxis_split_node_get_parent (leaf);
   g_hash_table_remove (self->pane_notifications, pane);
   notification_id = g_strconcat ("bell-", ptyxis_pane_get_uuid (pane), NULL);
   g_application_withdraw_notification (G_APPLICATION (PTYXIS_APPLICATION_DEFAULT),
@@ -1172,7 +1127,17 @@ ptyxis_tab_remove_pane (PtyxisTab  *self,
   gtk_widget_set_focusable (GTK_WIDGET (self), FALSE);
 
   ptyxis_pane_force_quit (pane);
+
+  /* Collapsing the split folds the sibling node into its parent and frees
+   * both the removed leaf and the sibling. The surviving GtkPaned was
+   * bound to the sibling node, so it must observe the parent node before
+   * that happens: its position callbacks look the node up on the widget,
+   * and a pending initial-ratio tick may still fire after the collapse.
+   */
+  if (GTK_IS_PANED (sibling))
+    ptyxis_split_layout_rebind (GTK_PANED (sibling), parent);
   ptyxis_split_node_remove (leaf);
+
   ptyxis_tab_update_split_sizing (self);
   ptyxis_tab_update_pane_accessibility (self);
   ptyxis_tab_invalidate_search_text (self);
@@ -1810,10 +1775,14 @@ ptyxis_tab_dispose (GObject *object)
   gtk_widget_dispose_template (GTK_WIDGET (self), PTYXIS_TYPE_TAB);
 
   self->active_pane = NULL;
-  g_clear_pointer (&self->split_root, ptyxis_split_node_unref);
 
+  /* Destroy the widget tree before the split nodes it is bound to: the
+   * paneds of a split layout keep looking their node up while they are
+   * torn down, so the nodes must still be alive at that point.
+   */
   while ((child = gtk_widget_get_first_child (GTK_WIDGET (self))))
     gtk_widget_unparent (child);
+  g_clear_pointer (&self->split_root, ptyxis_split_node_unref);
 
   g_clear_object (&self->cached_texture);
   g_clear_pointer (&self->uuid, g_free);
