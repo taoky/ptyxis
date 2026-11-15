@@ -2700,6 +2700,8 @@ ptyxis_window_new_for_command (PtyxisProfile      *profile,
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-tab", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-window", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-terminal", FALSE);
+      gtk_widget_action_set_enabled (GTK_WIDGET (self), "tab.split-horizontal", FALSE);
+      gtk_widget_action_set_enabled (GTK_WIDGET (self), "tab.split-vertical", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.tab-overview", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "page.move-left", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "page.move-right", FALSE);
