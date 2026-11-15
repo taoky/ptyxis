@@ -708,6 +708,22 @@
                             <property name="focus-on-click">false</property>
                           </object>
                         </child>
+                          <child type="end">
+                          <object class="GtkButton" id="tab_split_horizontal">
+                            <property name="icon-name">tilix-add-vertical</property>
+                            <property name="tooltip-text" translatable="yes">Split panel horizontal</property>
+                            <property name="action-name">tab.split-horizontal</property>
+                            <property name="focus-on-click">false</property>
+                          </object>
+                        </child>
+                          <child type="end">
+                          <object class="GtkButton" id="tab_split_vertical">
+                            <property name="icon-name">tilix-add-horizontal</property>
+                            <property name="tooltip-text" translatable="yes">Split panel vertical</property>
+                            <property name="action-name">tab.split-vertical</property>
+                            <property name="focus-on-click">false</property>
+                          </object>
+                        </child>
                       </object>
                     </child>
                   </object>

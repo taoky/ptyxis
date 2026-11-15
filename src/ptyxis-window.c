@@ -183,6 +183,24 @@ ptyxis_window_close_page_dialog_cb (GObject      *object,
     ptyxis_window_maybe_reset_default_size (self);
 }
 
+
+static void
+ptyxis_window_split_action (GtkWidget  *widget,
+                            const char *action_name,
+                            GVariant   *parameter)
+{
+    PtyxisWindow *self = PTYXIS_WINDOW (widget);
+    PtyxisTab *tab = ptyxis_window_get_active_tab (self);
+
+    if (tab == NULL)
+        return;
+
+    gtk_widget_activate_action (
+    GTK_WIDGET (tab),
+    action_name,
+    NULL);
+}
+
 static gboolean
 ptyxis_window_close_page_cb (PtyxisWindow *self,
                              AdwTabPage   *tab_page,
@@ -2316,6 +2334,18 @@ ptyxis_window_class_init (PtyxisWindowClass *klass)
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
 
+gtk_widget_class_install_action (
+    widget_class,
+    "tab.split-horizontal",
+    NULL,
+    ptyxis_window_split_action);
+
+gtk_widget_class_install_action (
+    widget_class,
+    "tab.split-vertical",
+    NULL,
+    ptyxis_window_split_action);
+
   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/Ptyxis/ptyxis-window.ui");
 
   gtk_widget_class_bind_template_child (widget_class, PtyxisWindow, find_bar);
@@ -2670,6 +2700,8 @@ ptyxis_window_new_for_command (PtyxisProfile      *profile,
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-tab", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-window", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.new-terminal", FALSE);
+      gtk_widget_action_set_enabled (GTK_WIDGET (self), "tab.split-horizontal", FALSE);
+      gtk_widget_action_set_enabled (GTK_WIDGET (self), "tab.split-vertical", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "win.tab-overview", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "page.move-left", FALSE);
       gtk_widget_action_set_enabled (GTK_WIDGET (self), "page.move-right", FALSE);

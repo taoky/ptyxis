@@ -31,6 +31,8 @@
     <file preprocess="xml-stripblanks">icons/scalable/actions/process-remote-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/process-superuser-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/up-small-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tilix-add-horizontal-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tilix-add-vertical-symbolic.svg</file>
 
     <!-- CSS -->
     <file>style.css</file>
