@@ -2102,10 +2102,22 @@ ptyxis_tab_class_init (PtyxisTabClass *klass)
 }
 
 static void
+ptyxis_tab_update_pane_dimming (GSettings *settings,
+                                const char *key,
+                                PtyxisTab  *self)
+{
+  if (g_settings_get_boolean (settings, key))
+    gtk_widget_add_css_class (GTK_WIDGET (self), "dim-inactive-panes");
+  else
+    gtk_widget_remove_css_class (GTK_WIDGET (self), "dim-inactive-panes");
+}
+
+static void
 ptyxis_tab_init (PtyxisTab *self)
 {
+  PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+  GSettings *gsettings = ptyxis_settings_get_settings (settings);
   GtkEventController *controller;
-
 
   gtk_widget_init_template (GTK_WIDGET (self));
 
@@ -2114,6 +2126,10 @@ ptyxis_tab_init (PtyxisTab *self)
   self->scrolled_window = ptyxis_pane_get_scrolled_window (self->pane);
   self->split_root = ptyxis_split_node_new_leaf (G_OBJECT (self->pane));
   self->active_pane = self->pane;
+  gtk_widget_add_css_class (GTK_WIDGET (self->pane), "active-pane");
+  g_signal_connect_object (gsettings, "changed::" PTYXIS_SETTING_KEY_DIM_INACTIVE_PANES,
+                           G_CALLBACK (ptyxis_tab_update_pane_dimming), self, 0);
+  ptyxis_tab_update_pane_dimming (gsettings, PTYXIS_SETTING_KEY_DIM_INACTIVE_PANES, self);
   self->uuid = g_strdup (ptyxis_pane_get_uuid (self->pane));
   self->pane_notifications = g_hash_table_new_full (g_direct_hash, g_direct_equal,
                                                      NULL, (GDestroyNotify)ptyxis_tab_notify_free);
@@ -2176,7 +2192,9 @@ ptyxis_tab_set_active_pane (PtyxisTab  *self,
       PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
 
       g_object_freeze_notify (G_OBJECT (self));
+      gtk_widget_remove_css_class (GTK_WIDGET (self->active_pane), "active-pane");
       self->active_pane = pane;
+      gtk_widget_add_css_class (GTK_WIDGET (pane), "active-pane");
       self->banner = ADW_BANNER (ptyxis_pane_get_banner (pane));
       self->terminal = ptyxis_pane_get_terminal (pane);
       self->scrolled_window = ptyxis_pane_get_scrolled_window (pane);

@@ -56,6 +56,7 @@ struct _PtyxisPreferencesWindow
   GtkFilterListModel   *filter_palettes;
   guint                 filter_show_more : 1;
 
+  AdwSwitchRow         *dim_inactive_panes;
   AdwSwitchRow         *audible_bell;
   AdwComboRow          *backspace_binding;
   AdwSpinRow           *cell_height_scale;
@@ -1156,6 +1157,9 @@ ptyxis_preferences_window_constructed (GObject *object)
                            ptyxis_preferences_window_create_profile_row_cb,
                            NULL, NULL);
 
+  g_settings_bind (gsettings, PTYXIS_SETTING_KEY_DIM_INACTIVE_PANES,
+                   self->dim_inactive_panes, "active", G_SETTINGS_BIND_DEFAULT);
+
   g_object_bind_property (settings, "audible-bell",
                           self->audible_bell, "active",
                           G_BINDING_SYNC_CREATE | G_BINDING_BIDIRECTIONAL);
@@ -1505,6 +1509,7 @@ ptyxis_preferences_window_class_init (PtyxisPreferencesWindowClass *klass)
 
   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/Ptyxis/ptyxis-preferences-window.ui");
 
+  gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, dim_inactive_panes);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, audible_bell);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, backspace_binding);
   gtk_widget_class_bind_template_child (widget_class, PtyxisPreferencesWindow, cell_height_scale);

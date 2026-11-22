@@ -26,6 +26,7 @@
 
 G_BEGIN_DECLS
 
+#define PTYXIS_SETTING_KEY_DIM_INACTIVE_PANES      "dim-inactive-panes"
 #define PTYXIS_SETTING_KEY_AUDIBLE_BELL            "audible-bell"
 #define PTYXIS_SETTING_KEY_CURSOR_BLINK_MODE       "cursor-blink-mode"
 #define PTYXIS_SETTING_KEY_CURSOR_SHAPE            "cursor-shape"

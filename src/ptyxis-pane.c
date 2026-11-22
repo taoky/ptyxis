@@ -308,6 +308,7 @@ ptyxis_pane_init (PtyxisPane *self)
   GtkEventController *focus;
   GtkWidget *box;
   GtkWidget *overlay;
+  GtkWidget *shade;
 
   self->zoom = PTYXIS_ZOOM_LEVEL_DEFAULT;
   self->uuid = g_uuid_string_random ();
@@ -348,6 +349,10 @@ ptyxis_pane_init (PtyxisPane *self)
   gtk_widget_set_direction (GTK_WIDGET (self->link_preview), GTK_TEXT_DIR_LTR);
   gtk_widget_add_css_class (GTK_WIDGET (self->link_preview), "link-preview");
   gtk_overlay_set_child (GTK_OVERLAY (overlay), GTK_WIDGET (self->scrolled_window));
+  shade = gtk_drawing_area_new ();
+  gtk_widget_set_can_target (shade, FALSE);
+  gtk_widget_add_css_class (shade, "pane-shade");
+  gtk_overlay_add_overlay (GTK_OVERLAY (overlay), shade);
   gtk_overlay_add_overlay (GTK_OVERLAY (overlay), GTK_WIDGET (self->link_preview));
   gtk_overlay_set_clip_overlay (GTK_OVERLAY (overlay), GTK_WIDGET (self->link_preview), TRUE);
   gtk_box_append (GTK_BOX (box), overlay);

@@ -114,6 +114,12 @@
       <description>Where to place new tabs</description>
     </key>
 
+    <key name="dim-inactive-panes" type="b">
+      <default>false</default>
+      <summary>Dim Inactive Panes</summary>
+      <description>Darken inactive terminal panes in split tabs</description>
+    </key>
+
     <key name="audible-bell" type="b">
       <default>true</default>
       <summary>Audible Bell</summary>

@@ -65,6 +65,16 @@
           </object>
         </child>
         <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title" translatable="yes">Panes</property>
+            <child>
+              <object class="AdwSwitchRow" id="dim_inactive_panes">
+                <property name="title" translatable="yes">Dim Inactive Panes</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
           <object class="AdwPreferencesGroup" id="opacity_group">
             <property name="visible">false</property>
             <child>

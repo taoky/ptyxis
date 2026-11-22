@@ -27,6 +27,10 @@ vte-terminal:drop(active) { border-radius: 0 0 11px 11px; }
   font-weight: 600;
 }
 
+.dim-inactive-panes ptyxis-pane:not(.active-pane) .pane-shade {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
 ptyxis-pane.search-target vte-terminal {
   box-shadow: inset 0 0 0 2px var(--accent-bg-color);
 }
